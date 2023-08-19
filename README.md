@@ -9,7 +9,9 @@
 Slime Proxy is a robust HTTP reverse proxy based on a unique Hub-Agent architecture. It is designed to streamline the process of managing multiple isomorphic service providers, who provide the same API, by grouping them into a single gateway. This reverse proxy setup simplifies the process of managing multiple service providers and ensures a seamless user experience.
 
 ## Architecture
+
 <img src="https://github.com/hoveychen/slime/raw/main/docs/architecture.png" width="600x">
+
 The architecture consists of three main components:
 
 - **Hub**: The hub server is the heart of the architecture. It accepts HTTP requests and intelligently forwards them to the appropriate agents. This allows for efficient load distribution and ensures optimal performance.
@@ -36,7 +38,7 @@ go install -u github.com/hoveychen/slime@latest
 ```
 Alternatively, you can download the pre-compiled binary from the provided link.
 
-[https://github.com/hoveychen/slime/releases]()
+[https://github.com/hoveychen/slime/releases](https://github.com/hoveychen/slime/releases)
 
 
 ## Getting Started
