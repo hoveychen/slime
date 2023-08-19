@@ -31,6 +31,9 @@ go install -u github.com/hoveychen/slime@latest
 ```
 Alternatively, you can download the pre-compiled binary from the provided link.
 
+[https://github.com/hoveychen/slime/releases]()
+
+
 ## Getting Started
 To initialize the proxy, a minimum of one hub and one agent is required.
 
@@ -65,4 +68,4 @@ slime agent run --token <agent token> --hub <hub address> --upstream <upstream a
 Contributions are welcome. Feel free to open issues and submit merge requests.
 
 ## License
-// Here you can add information about the license of your project.
+Apache 2.0
