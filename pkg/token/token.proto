@@ -1,0 +1,10 @@
+syntax = "proto3";
+option go_package = "github.com/hoveychen/slime/pkg/token";
+package token;
+
+message AgentToken {
+  int64 id = 1;
+  string name = 2;
+  int64 expire_at = 3;
+  repeated string scope_paths = 4;
+}
