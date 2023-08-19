@@ -37,10 +37,10 @@ func WithConcurrent(n int) HubServerOption {
 	}
 }
 
-func NewHubServer(secret string, opts ...HubServerOption) *HubServer {
+func NewHubServer(secret string, connPool *pool.Pool, opts ...HubServerOption) *HubServer {
 	hs := &HubServer{
 		tokenMgr: token.NewTokenManager([]byte(secret)),
-		connPool: pool.NewPool(),
+		connPool: connPool,
 	}
 	for _, opt := range opts {
 		opt(hs)

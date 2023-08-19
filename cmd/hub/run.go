@@ -20,6 +20,7 @@ import (
 	"net/http"
 
 	"github.com/hoveychen/slime/pkg/hub"
+	"github.com/hoveychen/slime/pkg/pool"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +39,8 @@ var runCmd = &cobra.Command{
 			opts = append(opts, hub.WithConcurrent(concurrent))
 		}
 
-		hub := hub.NewHubServer(secret, opts...)
+		pool := pool.NewPool()
+		hub := hub.NewHubServer(secret, pool, opts...)
 
 		addr := fmt.Sprintf("%s:%d", host, port)
 		fmt.Printf("Listening on %s\n", addr)

@@ -37,6 +37,10 @@ func (c *Connection) ID() int {
 	return c.id
 }
 
+func (c *Connection) Since() time.Time {
+	return c.since
+}
+
 func (c *Connection) AgentID() int64 {
 	return c.agentToken.GetId()
 }
