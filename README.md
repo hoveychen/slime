@@ -1,4 +1,11 @@
 # Slime Proxy
+
+![go build](https://github.com/hoveychen/slime/actions/workflows/go.yml/badge.svg)
+
+[![GoDoc reference example](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/hoveychen/slime)
+
+[![GoReportCard example](https://goreportcard.com/badge/github.com/hoveychen/slime)](https://goreportcard.com/report/github.com/hoveychen/slime)
+
 <img src="https://github.com/hoveychen/slime/raw/main/docs/mascot.png" width="300px">
 
 Slime Proxy is a robust HTTP reverse proxy based on a unique Hub-Agent architecture. It is designed to streamline the process of managing multiple isomorphic service providers, who provide the same API, by grouping them into a single gateway. This reverse proxy setup simplifies the process of managing multiple service providers and ensures a seamless user experience.
