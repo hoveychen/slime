@@ -6,6 +6,9 @@
 
 <img src="https://github.com/hoveychen/slime/raw/main/docs/mascot.png" width="300px">
 
+[中文](https://github.com/hoveychen/slime/blob/main/docs/README_cn.md)
+[日本語](https://github.com/hoveychen/slime/blob/main/docs/README_jp.md)
+
 Slime Proxy is a robust HTTP reverse proxy based on a unique Hub-Agent architecture. It is designed to streamline the process of managing multiple isomorphic service providers, who provide the same API, by grouping them into a single gateway. This reverse proxy setup simplifies the process of managing multiple service providers and ensures a seamless user experience.
 
 ## Architecture
