@@ -25,55 +25,44 @@ Slime Proxy offers several unique features that set it apart from traditional lo
 Slime Proxy is ideal for scenarios where you have multiple service providers offering the same API and you want to manage them through a single gateway. It's perfect for microservice architectures, multi-cloud environments, or simply when you want to ensure high availability and performance for your services.
 
 ### Installation
-When you have golang >= 1.18 with module enabled, simply install the project
-```
+To install the project, ensure that you have Golang version 1.18 or higher with module enabled. You can then install the project using the following command:
+```bash
 go install -u github.com/hoveychen/slime@latest
 ```
-
-Or you may download the pre-built binary here
-// TBC
+Alternatively, you can download the pre-compiled binary from the provided link.
 
 ## Getting Started
+To initialize the proxy, a minimum of one hub and one agent is required.
 
-To bring up the proxy, at least one hub and one agent are required.
-
-### Setup hub
-
-First, you need to generate a `<secret>` for the hub. This `<secret>` can be any text, best generated from random password generator, should be kept safe and privately. Once leaked, the proxy is vulnerable to the forged agents.
-
-Second, run the hub server by command:
-```
+### Hub Configuration
+Firstly, generate a `<secret>` for the hub. This `<secret>` can be any string, preferably generated from a random password generator. It should be stored securely and privately. If leaked, the proxy becomes susceptible to attacks from forged agents.
+Next, execute the hub server using the following command:
+```bash
 slime hub run --secret <secret>
 ```
+> It is recommended to set the `concurrent` flag to a reasonable value (e.g., `1024`) in a production environment, in addition to the explicit flags binding the `host` and `port` configurations. This helps to mitigate potential Distributed Denial of Service (DDoS) attacks.
 
-> Except for the explict flags binding config `host` and `port`, it's suggested to set the `concurrent` flag to a reasonable value like `1024` in the production environment, to prevent DDOS attack whatsoever.
-
-### Setup agent
-
-First, you need to generate an *Agent Token* for the agent to access to the hub. Execute command:
-
-```
+### Agent Configuration
+Firstly, generate an *Agent Token* for the agent to access the hub. This can be done using the following command:
+```bash
 slime hub register --secret <secret> --name <my agent name>
 ```
-
-The command will print a encrypted agent token to the standard output. Although you can reuse the agent token in multiple agents, it's suggested to assign one agent token per agent, to help audit and token reroll.
-
-Second, run the agent server by command:
-```
+This command will output an encrypted agent token. While it is possible to reuse the agent token across multiple agents, it is advisable to assign a unique agent token to each agent for auditing purposes and token reroll.
+Next, execute the agent server using the following command:
+```bash
 slime agent run --token <agent token> --hub <hub address> --upstream <upstream address> 
 ```
-
-> Typically, one agent is responsible for one upstream service. To setup multiple agents for multiple upstream services in one command, you may specify multiple upstream addresses separated by comma like
-> ```
+> Typically, one agent is responsible for one upstream service. To configure multiple agents for multiple upstream services in a single command, specify multiple upstream addresses separated by commas as shown below:
+> ```bash
 > slime agent run --token <agent token> --hub <hub address> --upstream <upstream1>,<upstream2>,<upstream3>
 > ```
-> In such case, same number of agents to the upstream providers are setup.
+> In this scenario, an equal number of agents are set up for the upstream providers.
 
 > [!NOTE]
-> The default setup assumes that the service provider works in single thread (for example, heavy-load generative AI task using GPU). If this is not the case, you may specify flag `numWorker` to increase the degree of parallelism. 
+> The default configuration assumes that the service provider operates in a single-threaded mode (e.g., heavy-load generative AI tasks using GPU). If this is not the case, you can increase the degree of parallelism by specifying the `numWorker` flag.
 
 ## Contributing
-Feel free to open issues and merge requests. @hoveychen is actively maintaining this project.
+Contributions are welcome. Feel free to open issues and submit merge requests.
 
 ## License
 // Here you can add information about the license of your project.
