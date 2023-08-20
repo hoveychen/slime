@@ -119,39 +119,60 @@ func TestConnection_Delegate(t *testing.T) {
 	}
 	conn.processing = false
 
+	// TODO(yuheng): Use channel instaed of time-based wait to prevent from the racing condition.
+	// Create a channel to signal when the Accept method has been called.
+	acceptCalled := make(chan struct{})
+
+	// Create a channel to signal when the NewSubmitter method has been called.
+	submitterCalled := make(chan struct{})
+
+	// Create a context with a timeout of 50 milliseconds.
+	ctx, cancel = context.WithTimeout(context.Background(), time.Millisecond*50)
+	defer cancel()
+
+	// Create a mock response writer and request.
+	respWriter = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	// Start a goroutine to call the Accept method and signal when it has been called.
 	go func() {
-		time.Sleep(10 * time.Millisecond)
-		conn.Accept(context.Background())
-		time.Sleep(10 * time.Millisecond)
+		conn.Accept(ctx)
+		close(acceptCalled)
+	}()
+
+	// Start a goroutine to call the NewSubmitter method and signal when it has been called.
+	go func() {
 		w, _ := conn.NewSubmitter()
 		w.Close()
+		close(submitterCalled)
 	}()
-	// Test that Delegate sets the connection to processing and returns nil when the request is accepted.
-	if delegateErr := conn.Delegate(context.Background(), respWriter, req); delegateErr != nil {
+
+	// Call the Delegate method and check that it returns nil and sets the connection to processing.
+	if delegateErr := conn.Delegate(ctx, respWriter, req); delegateErr != nil {
 		t.Errorf("Delegate() error = %v, want nil", delegateErr)
 	}
 	if !conn.processing {
 		t.Errorf("Delegate() conn.processing = false, want true")
 	}
+
+	// Wait for the Accept and NewSubmitter methods to be called.
+	<-acceptCalled
+	<-submitterCalled
+
+	// Reset the processing flag.
 	conn.processing = false
 
-	// Test that Delegate returns an error when the context is canceled while waiting for the response writer to finish.
-	wait := make(chan struct{})
+	// Create a channel to signal when the error has been checked.
+	errorChecked := make(chan struct{})
+
+	// Start a goroutine to call the Delegate method with a canceled context and check that it returns an error.
 	go func() {
-		time.Sleep(10 * time.Millisecond)
-		conn.Accept(context.Background())
-		time.Sleep(100 * time.Millisecond)
-		_, err := conn.NewSubmitter()
-		if err == nil {
-			// Expect an error, since the application has been canceled.
-			t.Errorf("Delegate() error = %v, want %v", err, context.DeadlineExceeded)
+		if delegateErr := conn.Delegate(ctx, respWriter, req); delegateErr != context.DeadlineExceeded {
+			t.Errorf("Delegate() error = %v, want %v", delegateErr, context.DeadlineExceeded)
 		}
-		close(wait)
+		close(errorChecked)
 	}()
-	ctx, cancel = context.WithTimeout(context.Background(), time.Millisecond*50)
-	if delegateErr := conn.Delegate(ctx, respWriter, req); delegateErr != context.DeadlineExceeded {
-		t.Errorf("Delegate() error = %v, want %v", delegateErr, context.DeadlineExceeded)
-	}
-	<-wait
-	cancel()
+
+	// Wait for the error to be checked.
+	<-errorChecked
 }
