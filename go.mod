@@ -1,6 +1,6 @@
 module github.com/hoveychen/slime
 
-go 1.18
+go 1.20
 
 require (
 	github.com/dustinkirkland/golang-petname v0.0.0-20230626224747-e794b9370d49
