@@ -36,7 +36,7 @@ type Connection struct {
 	since      time.Time
 	id         int
 	processing atomic.Bool
-	err        error
+	err        atomic.Value
 	respWriter *WriteCloser
 }
 
@@ -86,8 +86,8 @@ func (c *Connection) NewSubmitter() (*WriteCloser, error) {
 	if !c.processing.Load() {
 		return nil, ErrNotProcessing
 	}
-	if c.err != nil {
-		return nil, c.err
+	if c.err.Load() != nil {
+		return nil, c.err.Load().(error)
 	}
 	return c.respWriter, nil
 }
@@ -96,10 +96,10 @@ func (c *Connection) SubmitError(ctx context.Context, err error) error {
 	if !c.processing.Load() {
 		return ErrNotProcessing
 	}
-	if c.err != nil {
-		return c.err
+	if c.err.Load() != nil {
+		return c.err.Load().(error)
 	}
-	c.err = err
+	c.err.Store(err)
 	c.respWriter.Close()
 	return nil
 }
@@ -121,12 +121,12 @@ func (c *Connection) Delegate(ctx context.Context, w http.ResponseWriter, req *h
 	select {
 	case <-ctx.Done():
 		// The request has been canceled.
-		c.err = ctx.Err()
+		c.err.Store(ctx.Err())
 		return ctx.Err()
 	case <-c.respWriter.Done():
 	}
-	if c.err != nil {
-		return c.err
+	if c.err.Load() != nil {
+		return c.err.Load().(error)
 	}
 	return nil
 }
