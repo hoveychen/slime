@@ -17,6 +17,7 @@ package token
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -100,4 +101,53 @@ func TestTokenManager_EncryptDecryptToken(t *testing.T) {
 			t.Errorf("scope paths not match: %v != %v", token.GetScopePaths(), decrypted.GetScopePaths())
 		}
 	}
+}
+
+func TestNewContext(t *testing.T) {
+	// Create a new context
+	ctx := context.Background()
+
+	// Create a new agent token
+	token := &AgentToken{
+		Id:         123,
+		Name:       "test",
+		ScopePaths: []string{"/api/foo/bar"},
+	}
+
+	// Add the agent token to the context
+	ctx = NewContext(ctx, token)
+
+	// Retrieve the agent token from the context
+	retrievedToken := FromContext(ctx)
+
+	// Check that the retrieved token matches the original token
+	assert.Equal(t, token, retrievedToken)
+}
+
+func TestFromContext_NoToken(t *testing.T) {
+	// Create a new context
+	ctx := context.Background()
+
+	// Retrieve the agent token from the context
+	retrievedToken := FromContext(ctx)
+
+	// Check that the retrieved token is nil
+	assert.Nil(t, retrievedToken)
+}
+
+func TestNewTokenManager(t *testing.T) {
+	// Test with key length less than 32 bytes
+	key := []byte("0123456789abcdef")
+	tm := NewTokenManager(key)
+	assert.NotNil(t, tm.gcm)
+
+	// Test with key length equal to 32 bytes
+	key = []byte("0123456789abcdef0123456789abcdef")
+	tm = NewTokenManager(key)
+	assert.NotNil(t, tm.gcm)
+
+	// Test with key length greater than 32 bytes
+	key = []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0")
+	tm = NewTokenManager(key)
+	assert.NotNil(t, tm.gcm)
 }

@@ -22,6 +22,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/hoveychen/slime/pkg/token"
 )
 
 func TestConnection_Accept(t *testing.T) {
@@ -154,4 +156,89 @@ func TestConnection_Delegate(t *testing.T) {
 	}
 	<-wait
 	cancel()
+}
+
+func TestNewConnection(t *testing.T) {
+	// Test that NewConnection returns a non-nil connection.
+	token := &token.AgentToken{}
+	conn := NewConnection(token)
+	if conn == nil {
+		t.Error("NewConnection() returned nil")
+	}
+
+	// Test that the connection's agentToken field is set correctly.
+	if conn.agentToken != token {
+		t.Error("NewConnection() did not set the agentToken field correctly")
+	}
+
+	// Test that the connection's req field is a non-nil channel.
+	if conn.req == nil {
+		t.Error("NewConnection() did not initialize the req field")
+	}
+
+	// Test that the connection's id field is a non-zero value.
+	if conn.id == 0 {
+		t.Error("NewConnection() did not initialize the id field")
+	}
+
+	// Test that the connection's since field is a non-zero value.
+	if conn.since.IsZero() {
+		t.Error("NewConnection() did not initialize the since field")
+	}
+}
+
+func TestConnection_ID(t *testing.T) {
+	// Test that ID returns the correct value.
+	conn := &Connection{id: 123}
+	if id := conn.ID(); id != 123 {
+		t.Errorf("ID() = %d, want %d", id, 123)
+	}
+}
+
+func TestConnection_Since(t *testing.T) {
+	// Test that Since returns the correct value.
+	now := time.Now()
+	conn := &Connection{since: now}
+	if since := conn.Since(); !since.Equal(now) {
+		t.Errorf("Since() = %v, want %v", since, now)
+	}
+}
+
+func TestConnection_AgentID(t *testing.T) {
+	// Test that AgentID returns the correct value.
+	token := &token.AgentToken{Id: 123}
+	conn := &Connection{agentToken: token}
+	if id := conn.AgentID(); id != 123 {
+		t.Errorf("AgentID() = %d, want %d", id, 123)
+	}
+}
+
+func TestConnection_AgentName(t *testing.T) {
+	// Test that AgentName returns the correct value.
+	token := &token.AgentToken{Name: "test"}
+	conn := &Connection{agentToken: token}
+	if name := conn.AgentName(); name != "test" {
+		t.Errorf("AgentName() = %s, want %s", name, "test")
+	}
+}
+
+func TestConnection_ScopePaths(t *testing.T) {
+	// Test that ScopePaths returns the correct value.
+	token := &token.AgentToken{ScopePaths: []string{"test"}}
+	conn := &Connection{agentToken: token}
+	if paths := conn.ScopePaths(); len(paths) != 1 || paths[0] != "test" {
+		t.Errorf("ScopePaths() = %v, want %v", paths, []string{"test"})
+	}
+}
+
+func TestConnection_IsProcessing(t *testing.T) {
+	// Test that IsProcessing returns the correct value.
+	conn := &Connection{}
+	if processing := conn.IsProcessing(); processing {
+		t.Errorf("IsProcessing() = %v, want %v", processing, false)
+	}
+	conn.processing.Store(true)
+	if processing := conn.IsProcessing(); !processing {
+		t.Errorf("IsProcessing() = %v, want %v", processing, true)
+	}
 }

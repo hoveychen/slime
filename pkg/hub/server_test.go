@@ -22,7 +22,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hoveychen/slime/pkg/pool"
 	"github.com/hoveychen/slime/pkg/token"
+	"github.com/stretchr/testify/assert"
 )
 
 type mockTokenManager struct {
@@ -106,5 +108,71 @@ func TestWrapTokenValidator(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestNewHubServer(t *testing.T) {
+	// Test with default options
+	secret := "test-secret"
+	connPool := &pool.Pool{}
+	hs := NewHubServer(secret, connPool)
+	assert.NotNil(t, hs.tokenMgr)
+	assert.Equal(t, connPool, hs.connPool)
+	assert.Nil(t, hs.concurrent)
+
+	// Test with concurrent option
+	hs = NewHubServer(secret, connPool, WithConcurrent(10))
+	assert.NotNil(t, hs.tokenMgr)
+	assert.Equal(t, connPool, hs.connPool)
+	assert.NotNil(t, hs.concurrent)
+}
+
+func TestHandleAgentJoin(t *testing.T) {
+	// Create a mock HubServer
+	hs := &HubServer{}
+
+	// Create a mock request with a context containing a valid token
+	req := httptest.NewRequest("GET", "/", nil)
+	ctx := req.Context()
+	ctx = token.NewContext(ctx, &token.AgentToken{
+		Id:   123,
+		Name: "test-agent",
+	})
+	req = req.WithContext(ctx)
+
+	// Create a mock response recorder
+	rr := httptest.NewRecorder()
+
+	// Call the handleAgentJoin method
+	hs.handleAgentJoin(rr, req)
+
+	// Check that the response status code is 200
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handleAgentJoin returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+}
+
+func TestHandleAgentLeave(t *testing.T) {
+	// Create a mock HubServer
+	hs := &HubServer{}
+
+	// Create a mock request with a context containing a valid token
+	req := httptest.NewRequest("GET", "/", nil)
+	ctx := req.Context()
+	ctx = token.NewContext(ctx, &token.AgentToken{
+		Id:   123,
+		Name: "test-agent",
+	})
+	req = req.WithContext(ctx)
+
+	// Create a mock response recorder
+	rr := httptest.NewRecorder()
+
+	// Call the handleAgentJoin method
+	hs.handleAgentLeave(rr, req)
+
+	// Check that the response status code is 200
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handleAgentLeave returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 }

@@ -36,7 +36,7 @@ Slime Proxy offers several unique features that set it apart from traditional lo
 Slime Proxy is ideal for scenarios where you have multiple service providers offering the same API and you want to manage them through a single gateway. It's perfect for microservice architectures, multi-cloud environments, or simply when you want to ensure high availability and performance for your services.
 
 ### Installation
-To install the project, ensure that you have Golang version 1.18 or higher with module enabled. You can then install the project using the following command:
+To install the project, ensure that you have Golang version 1.20 or higher with module enabled. You can then install the project using the following command:
 ```bash
 go install -u github.com/hoveychen/slime@latest
 ```

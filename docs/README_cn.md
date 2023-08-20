@@ -35,7 +35,7 @@
 
 ### 安装
 
-要安装该项目，请确保您的Golang版本为1.18或更高，并启用了模块。然后可以使用以下命令安装该项目：
+要安装该项目，请确保您的Golang版本为1.20或更高，并启用了模块。然后可以使用以下命令安装该项目：
 ```bash
 go install -u github.com/hoveychen/slime@latest
 ```

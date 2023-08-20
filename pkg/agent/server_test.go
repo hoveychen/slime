@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -162,5 +163,146 @@ func TestFixUpstreamRequest(t *testing.T) {
 	}
 	if req.RequestURI != "" {
 		t.Errorf("Expected request URI to be empty, but got %s", req.RequestURI)
+	}
+}
+
+func TestNewAgentServer(t *testing.T) {
+	// Test case 1: Valid hub and upstream addresses, with default options.
+	hubAddr := "http://localhost:8080"
+	upstreamAddr := "http://localhost:9090"
+	token := "abc123"
+	as, err := NewAgentServer(hubAddr, upstreamAddr, token)
+	if err != nil {
+		t.Errorf("Expected nil error, but got %v", err)
+	}
+	if as.token != token {
+		t.Errorf("Expected token to be %s, but got %s", token, as.token)
+	}
+	if as.numWorker != defaultNumWorker {
+		t.Errorf("Expected numWorker to be %d, but got %d", defaultNumWorker, as.numWorker)
+	}
+	if as.hubURL.String() != hubAddr {
+		t.Errorf("Expected hubURL to be %s, but got %s", hubAddr, as.hubURL.String())
+	}
+	if as.upstreamURL.String() != upstreamAddr {
+		t.Errorf("Expected upstreamURL to be %s, but got %s", upstreamAddr, as.upstreamURL.String())
+	}
+
+	// Test case 2: Valid hub and upstream addresses, with custom options.
+	numWorker := 5
+	as, err = NewAgentServer(hubAddr, upstreamAddr, token, WithNumWorker(numWorker))
+	if err != nil {
+		t.Errorf("Expected nil error, but got %v", err)
+	}
+	if as.numWorker != numWorker {
+		t.Errorf("Expected numWorker to be %d, but got %d", numWorker, as.numWorker)
+	}
+
+	// Test case 3: Invalid hub address.
+	hubAddr = "invalid"
+	_, err = NewAgentServer(hubAddr, upstreamAddr, token)
+	if err == nil {
+		t.Errorf("Expected non-nil error, but got nil")
+	}
+
+	// Test case 4: Invalid upstream address.
+	hubAddr = "http://localhost:8080"
+	upstreamAddr = "invalid"
+	_, err = NewAgentServer(hubAddr, upstreamAddr, token)
+	if err == nil {
+		t.Errorf("Expected non-nil error, but got nil")
+	}
+}
+
+func TestWithNumWorker(t *testing.T) {
+	// Create a new AgentServer with default options.
+	hubAddr := "http://localhost:8080"
+	upstreamAddr := "http://localhost:9090"
+	token := "abc123"
+	as, err := NewAgentServer(hubAddr, upstreamAddr, token)
+	if err != nil {
+		t.Errorf("Expected nil error, but got %v", err)
+	}
+
+	// Call the WithNumWorker option with a custom number of workers.
+	numWorker := 5
+	WithNumWorker(numWorker)(as)
+	if as.numWorker != numWorker {
+		t.Errorf("Expected numWorker to be %d, but got %d", numWorker, as.numWorker)
+	}
+}
+
+func TestJoinHubSuccess(t *testing.T) {
+	// Create a new AgentServer with a mock hub URL and token.
+	as := &AgentServer{
+		hubURL: &url.URL{Scheme: "http", Host: "localhost:8080"},
+		token:  "abc123",
+	}
+
+	// Create a new mock HTTP server that returns a 200 OK response.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer mockServer.Close()
+
+	// Set the mock server URL as the hub URL.
+	as.hubURL, _ = url.Parse(mockServer.URL)
+
+	// Call the joinHub method.
+	err := as.joinHub(context.Background())
+
+	// Check that the error is nil.
+	if err != nil {
+		t.Errorf("Expected nil error, but got %v", err)
+	}
+}
+
+func TestJoinHubError(t *testing.T) {
+	// Create a new AgentServer with a mock hub URL and token.
+	as := &AgentServer{
+		hubURL: &url.URL{Scheme: "http", Host: "localhost:8080"},
+		token:  "abc123",
+	}
+
+	// Create a new mock HTTP server that returns a 500 Internal Server Error response.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer mockServer.Close()
+
+	// Set the mock server URL as the hub URL.
+	as.hubURL, _ = url.Parse(mockServer.URL)
+
+	// Call the joinHub method.
+	err := as.joinHub(context.Background())
+
+	// Check that the error is not nil.
+	if err == nil {
+		t.Errorf("Expected non-nil error, but got nil")
+	}
+}
+
+func TestJoinHubHTTPError(t *testing.T) {
+	// Create a new AgentServer with a mock hub URL and token.
+	as := &AgentServer{
+		hubURL: &url.URL{Scheme: "http", Host: "localhost:8080"},
+		token:  "abc123",
+	}
+
+	// Create a new mock HTTP server that returns a 404 Not Found response.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	// Set the mock server URL as the hub URL.
+	as.hubURL, _ = url.Parse(mockServer.URL)
+
+	// Call the joinHub method.
+	err := as.joinHub(context.Background())
+
+	// Check that the error is not nil.
+	if err == nil {
+		t.Errorf("Expected non-nil error, but got nil")
 	}
 }
