@@ -65,7 +65,7 @@ func NewHubServer(secret string, connPool *pool.Pool, opts ...HubServerOption) *
 
 func (hs *HubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	token := r.Header.Get("slime-agent-token")
-	if token != "" {
+	if token != "" && r.Method == "POST" {
 		var handler http.Handler
 		switch r.URL.Path {
 		case PathJoin:

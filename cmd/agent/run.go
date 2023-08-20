@@ -16,10 +16,10 @@ limitations under the License.
 package agent
 
 import (
-	"fmt"
-
 	"github.com/hoveychen/slime/pkg/agent"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 // runCmd represents the run command
@@ -30,21 +30,26 @@ var runCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		token := cmd.Flag("token").Value.String()
 		hub := cmd.Flag("hub").Value.String()
-		upstream := cmd.Flag("upstream").Value.String()
+		upstreams, _ := cmd.PersistentFlags().GetStringSlice("upstream")
 
 		var opts []agent.AgentServerOption
 		if numWorker, err := cmd.Flags().GetInt("numWorker"); err == nil && numWorker > 1 {
 			opts = append(opts, agent.WithNumWorker(numWorker))
 		}
 
-		fmt.Printf("Starting agent")
-		agent, err := agent.NewAgentServer(hub, upstream, token, opts...)
-		if err != nil {
-			panic(err)
+		grp, ctx := errgroup.WithContext(cmd.Context())
+		for _, upstream := range upstreams {
+			logrus.WithField("upstream", upstream).Info("Starting agent for upstream")
+			agent, err := agent.NewAgentServer(hub, upstream, token, opts...)
+			if err != nil {
+				panic(err)
+			}
+
+			grp.Go(func() error {
+				return agent.Run(ctx)
+			})
 		}
-		if err := agent.Run(cmd.Context()); err != nil {
-			panic(err)
-		}
+		grp.Wait()
 	},
 }
 
@@ -52,7 +57,7 @@ func init() {
 	AgentCmd.AddCommand(runCmd)
 
 	// Here you will define your flags and configuration settings.
-	runCmd.PersistentFlags().String("upstream", "", "The upstream address")
+	runCmd.PersistentFlags().StringSlice("upstream", nil, "The upstream address")
 	runCmd.MarkPersistentFlagRequired("upstream")
 	runCmd.PersistentFlags().Int("numWorker", 1, "The number of workers to handle the requests")
 }

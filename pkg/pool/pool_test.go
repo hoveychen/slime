@@ -95,6 +95,9 @@ func TestPool_GetPendingConnections(t *testing.T) {
 	if len(conns) != 2 {
 		t.Errorf("GetPendingConnections() failed to get all pending connections")
 	}
+	slices.SortFunc(conns, func(i, j *Connection) int {
+		return i.id - j.id
+	})
 	if conns[0] != conn1 || conns[1] != conn2 {
 		t.Errorf("GetPendingConnections() returned incorrect connections")
 	}

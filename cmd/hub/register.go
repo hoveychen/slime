@@ -22,6 +22,7 @@ import (
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/hoveychen/slime/pkg/token"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +34,7 @@ var registerCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := cmd.Flag("name").Value.String()
 		age, _ := cmd.Flags().GetDuration("age")
-		scopePaths, _ := cmd.Flags().GetStringArray("scopePaths")
+		scopePaths, _ := cmd.Flags().GetStringSlice("scopePaths")
 		secret := cmd.Flag("secret").Value.String()
 
 		if name == "" {
@@ -53,7 +54,8 @@ var registerCmd = &cobra.Command{
 		tokenMgr := token.NewTokenManager([]byte(secret))
 		data, err := tokenMgr.Encrypt(&agentToken)
 		if err != nil {
-			panic(err)
+			logrus.WithError(err).Error("Failed to encrypt the agent token")
+			return
 		}
 
 		fmt.Println(string(data))
@@ -65,5 +67,5 @@ func init() {
 
 	registerCmd.PersistentFlags().String("name", "", "The agent name")
 	registerCmd.PersistentFlags().Duration("age", 0, "When specified, the token will be expired after the specified age. format like '1h2m3s'")
-	registerCmd.PersistentFlags().StringArray("scopePaths", []string{}, "When specified, the agent accepts only the scoped paths")
+	registerCmd.PersistentFlags().StringSlice("scopePaths", []string{}, "When specified, the agent accepts only the scoped paths")
 }

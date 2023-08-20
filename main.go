@@ -15,8 +15,12 @@ limitations under the License.
 */
 package main
 
-import "github.com/hoveychen/slime/cmd"
+import (
+	"github.com/hoveychen/slime/cmd"
+	"github.com/sirupsen/logrus"
+)
 
 func main() {
+	logrus.SetFormatter(&logrus.TextFormatter{TimestampFormat: "2006-01-02 15:04:05.000", FullTimestamp: true})
 	cmd.Execute()
 }

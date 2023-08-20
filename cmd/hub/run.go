@@ -21,6 +21,7 @@ import (
 
 	"github.com/hoveychen/slime/pkg/hub"
 	"github.com/hoveychen/slime/pkg/pool"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -43,10 +44,10 @@ var runCmd = &cobra.Command{
 		hub := hub.NewHubServer(secret, pool, opts...)
 
 		addr := fmt.Sprintf("%s:%d", host, port)
-		fmt.Printf("Listening on %s\n", addr)
+		logrus.WithField("addr", addr).Info("Starting hub server")
 		err := http.ListenAndServe(addr, hub)
 		if err != nil {
-			panic(err)
+			logrus.WithError(err).Error("Hub server terminated")
 		}
 	},
 }
