@@ -20,6 +20,7 @@ import (
 	"errors"
 	"math/rand"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/hoveychen/slime/pkg/token"
@@ -34,7 +35,7 @@ type Connection struct {
 	req        chan (*http.Request)
 	since      time.Time
 	id         int
-	processing bool
+	processing atomic.Bool
 	err        error
 	respWriter *WriteCloser
 }
@@ -69,7 +70,7 @@ func (c *Connection) ScopePaths() []string {
 }
 
 func (c *Connection) IsProcessing() bool {
-	return c.processing
+	return c.processing.Load()
 }
 
 func (c *Connection) Accept(ctx context.Context) *http.Request {
@@ -82,7 +83,7 @@ func (c *Connection) Accept(ctx context.Context) *http.Request {
 }
 
 func (c *Connection) NewSubmitter() (*WriteCloser, error) {
-	if !c.processing {
+	if !c.processing.Load() {
 		return nil, ErrNotProcessing
 	}
 	if c.err != nil {
@@ -92,7 +93,7 @@ func (c *Connection) NewSubmitter() (*WriteCloser, error) {
 }
 
 func (c *Connection) SubmitError(ctx context.Context, err error) error {
-	if !c.processing {
+	if !c.processing.Load() {
 		return ErrNotProcessing
 	}
 	if c.err != nil {
@@ -104,10 +105,10 @@ func (c *Connection) SubmitError(ctx context.Context, err error) error {
 }
 
 func (c *Connection) Delegate(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
-	if c.processing {
+	processing := c.processing.Swap(true)
+	if processing {
 		return ErrAlreadyProcessing
 	}
-	c.processing = true
 
 	c.respWriter = NewWriteCloser(w)
 	select {
