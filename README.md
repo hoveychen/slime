@@ -3,6 +3,7 @@
 ![go build](https://github.com/hoveychen/slime/actions/workflows/go.yml/badge.svg)
 [![GoDoc reference example](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/hoveychen/slime)
 [![GoReportCard example](https://goreportcard.com/badge/github.com/hoveychen/slime)](https://goreportcard.com/report/github.com/hoveychen/slime)
+[![Coverage Status](https://coveralls.io/repos/github/hoveychen/slime/badge.svg?branch=main)](https://coveralls.io/github/hoveychen/slime?branch=main)
 
 <img src="https://github.com/hoveychen/slime/raw/main/docs/mascot.png" width="300px">
 
