@@ -16,7 +16,9 @@ limitations under the License.
 package hwinfo
 
 import (
+	"fmt"
 	"runtime"
+	"sort"
 
 	"github.com/jaypipes/ghw"
 )
@@ -27,7 +29,7 @@ type HWInfo struct {
 	MemoryUsableGB   float32
 	MemoryPhysicalGB float32
 	GPUNames         []string
-	NetworkAddresses []string
+	MacAddresses     []string
 	PlatformArch     string
 	PlatformOS       string
 }
@@ -69,6 +71,21 @@ func NewHWInfo() *HWInfo {
 				info.GPUNames = append(info.GPUNames, "Unknown")
 			}
 		}
+		// compress the same GPU
+		names := make(map[string]int)
+		for _, name := range info.GPUNames {
+			names[name]++
+		}
+		var newNames []string
+		for k, v := range names {
+			newName := k
+			if v > 1 {
+				newName = fmt.Sprintf("%dx %s", v, newName)
+			}
+			newNames = append(newNames, newName)
+		}
+		sort.Strings(newNames)
+		info.GPUNames = newNames
 	})
 
 	safeExec(func() {
@@ -81,11 +98,7 @@ func NewHWInfo() *HWInfo {
 				continue
 			}
 
-			if nic.PCIAddress == nil {
-				continue
-			}
-
-			info.NetworkAddresses = append(info.NetworkAddresses, *nic.PCIAddress)
+			info.MacAddresses = append(info.MacAddresses, nic.MacAddress)
 		}
 	})
 
