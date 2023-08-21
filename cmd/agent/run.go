@@ -31,10 +31,14 @@ var runCmd = &cobra.Command{
 		token := cmd.Flag("token").Value.String()
 		hub := cmd.Flag("hub").Value.String()
 		upstreams, _ := cmd.PersistentFlags().GetStringSlice("upstream")
+		reportHardware, _ := cmd.PersistentFlags().GetBool("reportHardware")
 
 		var opts []agent.AgentServerOption
 		if numWorker, err := cmd.Flags().GetInt("numWorker"); err == nil && numWorker > 1 {
 			opts = append(opts, agent.WithNumWorker(numWorker))
+		}
+		if !reportHardware {
+			opts = append(opts, agent.WithReportHardware(false))
 		}
 
 		grp, ctx := errgroup.WithContext(cmd.Context())
@@ -46,7 +50,10 @@ var runCmd = &cobra.Command{
 			}
 
 			grp.Go(func() error {
-				return agent.Run(ctx)
+				if err := agent.Run(ctx); err != nil {
+					logrus.WithField("upstream", upstream).WithError(err).Error("Agent server terminated")
+				}
+				return err
 			})
 		}
 		grp.Wait()
@@ -60,4 +67,5 @@ func init() {
 	runCmd.PersistentFlags().StringSlice("upstream", nil, "The upstream address")
 	runCmd.MarkPersistentFlagRequired("upstream")
 	runCmd.PersistentFlags().Int("numWorker", 1, "The number of workers to handle the requests")
+	runCmd.PersistentFlags().Bool("reportHardware", true, "Report the hardware information to the hub")
 }

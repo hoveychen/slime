@@ -232,6 +232,27 @@ func TestWithNumWorker(t *testing.T) {
 	}
 }
 
+func TestWithReportHardware(t *testing.T) {
+	// Create a new AgentServer with reportHW set to false.
+	as := &AgentServer{}
+
+	// Call the WithReportHardware function with true.
+	WithReportHardware(true)(as)
+
+	// Check that reportHW is true.
+	if !as.reportHW {
+		t.Errorf("Expected reportHW to be true, but got false")
+	}
+
+	// Call the WithReportHardware function with false.
+	WithReportHardware(false)(as)
+
+	// Check that reportHW is false.
+	if as.reportHW {
+		t.Errorf("Expected reportHW to be false, but got true")
+	}
+}
+
 func TestJoinHubSuccess(t *testing.T) {
 	// Create a new AgentServer with a mock hub URL and token.
 	as := &AgentServer{

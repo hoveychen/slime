@@ -17,9 +17,12 @@ package agent
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -28,6 +31,7 @@ import (
 	"time"
 
 	"github.com/hoveychen/slime/pkg/hub"
+	"github.com/hoveychen/slime/pkg/hwinfo"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -39,9 +43,12 @@ const defaultNumWorker = 1
 // 2. Forward hub's request to the right upstream
 type AgentServer struct {
 	numWorker   int
+	reportHW    bool
 	token       string
 	upstreamURL *url.URL
 	hubURL      *url.URL
+	agentID     int
+	hwInfo      *hwinfo.HWInfo
 }
 
 type AgentServerOption func(as *AgentServer)
@@ -61,16 +68,29 @@ func NewAgentServer(hubAddr, upstreamAddr, token string, opts ...AgentServerOpti
 		numWorker:   defaultNumWorker,
 		hubURL:      hubURL,
 		upstreamURL: upstreamURL,
+		reportHW:    true,
+		agentID:     int(rand.Int63()),
 	}
 	for _, opt := range opts {
 		opt(as)
 	}
+
+	if as.reportHW {
+		as.hwInfo = hwinfo.NewHWInfo()
+	}
+
 	return as, nil
 }
 
 func WithNumWorker(num int) AgentServerOption {
 	return func(as *AgentServer) {
 		as.numWorker = num
+	}
+}
+
+func WithReportHardware(report bool) AgentServerOption {
+	return func(as *AgentServer) {
+		as.reportHW = report
 	}
 }
 
@@ -126,6 +146,7 @@ func (as *AgentServer) newHubAPIRequest(ctx context.Context, apiPath string, rea
 	u.Path = path.Join(u.Path, apiPath)
 	req, _ := http.NewRequest("POST", u.String(), reader)
 	req.Header.Set("slime-agent-token", as.token)
+	req.Header.Set("slime-agent-id", strconv.Itoa(as.agentID))
 	return req
 }
 
@@ -138,7 +159,15 @@ func (as *AgentServer) fixUpstreamRequest(r *http.Request) {
 }
 
 func (as *AgentServer) joinHub(ctx context.Context) error {
-	req := as.newHubAPIRequest(ctx, hub.PathJoin, nil)
+	var body io.Reader
+	if as.hwInfo != nil {
+		json, err := json.Marshal(as.hwInfo)
+		if err != nil {
+			return err
+		}
+		body = bufio.NewReader(bytes.NewReader(json))
+	}
+	req := as.newHubAPIRequest(ctx, hub.PathJoin, body)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err

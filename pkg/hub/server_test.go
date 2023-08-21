@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hoveychen/slime/pkg/pool"
+	"github.com/hoveychen/slime/pkg/hwinfo"
 	"github.com/hoveychen/slime/pkg/token"
 	"github.com/stretchr/testify/assert"
 )
@@ -67,6 +67,7 @@ func TestWrapTokenValidator(t *testing.T) {
 		t.Fatalf("Failed to create request: %v", err)
 	}
 	req.Header.Set("slime-agent-token", encryptedToken)
+	req.Header.Set("slime-agent-id", "123")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
@@ -82,6 +83,7 @@ func TestWrapTokenValidator(t *testing.T) {
 		t.Fatalf("Failed to create request: %v", err)
 	}
 	req.Header.Set("slime-agent-token", encryptedToken)
+	req.Header.Set("slime-agent-id", "123")
 	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
@@ -102,6 +104,7 @@ func TestWrapTokenValidator(t *testing.T) {
 		t.Fatalf("Failed to create request: %v", err)
 	}
 	req.Header.Set("slime-agent-token", encryptedToken)
+	req.Header.Set("slime-agent-id", "123")
 	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
@@ -114,22 +117,21 @@ func TestWrapTokenValidator(t *testing.T) {
 func TestNewHubServer(t *testing.T) {
 	// Test with default options
 	secret := "test-secret"
-	connPool := &pool.Pool{}
-	hs := NewHubServer(secret, connPool)
+	hs := NewHubServer(secret)
 	assert.NotNil(t, hs.tokenMgr)
-	assert.Equal(t, connPool, hs.connPool)
 	assert.Nil(t, hs.concurrent)
 
 	// Test with concurrent option
-	hs = NewHubServer(secret, connPool, WithConcurrent(10))
+	hs = NewHubServer(secret, WithConcurrent(10))
 	assert.NotNil(t, hs.tokenMgr)
-	assert.Equal(t, connPool, hs.connPool)
 	assert.NotNil(t, hs.concurrent)
 }
 
 func TestHandleAgentJoin(t *testing.T) {
 	// Create a mock HubServer
-	hs := &HubServer{}
+	hs := &HubServer{
+		hwInfos: make(map[int]*hwinfo.HWInfo),
+	}
 
 	// Create a mock request with a context containing a valid token
 	req := httptest.NewRequest("GET", "/", nil)
@@ -154,7 +156,9 @@ func TestHandleAgentJoin(t *testing.T) {
 
 func TestHandleAgentLeave(t *testing.T) {
 	// Create a mock HubServer
-	hs := &HubServer{}
+	hs := &HubServer{
+		hwInfos: make(map[int]*hwinfo.HWInfo),
+	}
 
 	// Create a mock request with a context containing a valid token
 	req := httptest.NewRequest("GET", "/", nil)
@@ -175,4 +179,39 @@ func TestHandleAgentLeave(t *testing.T) {
 	if status := rr.Code; status != http.StatusOK {
 		t.Errorf("handleAgentLeave returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
+}
+
+func TestHubServer_GetHWInfo(t *testing.T) {
+	// Create a new HubServer instance
+	hs := &HubServer{
+		hwInfos: map[int]*hwinfo.HWInfo{
+			1: {GPUNames: []string{"NVIDIA GeForce GTX 1080 Ti"}},
+			2: {GPUNames: []string{"NVIDIA GeForce GTX 1080"}},
+		},
+	}
+
+	// Test case 1: valid node ID
+	hwInfo := hs.GetHWInfo(1)
+	assert.NotNil(t, hwInfo)
+	assert.Equal(t, []string{"NVIDIA GeForce GTX 1080 Ti"}, hwInfo.GPUNames)
+
+	// Test case 2: invalid node ID
+	hwInfo = hs.GetHWInfo(3)
+	assert.Nil(t, hwInfo)
+}
+
+func TestHubServer_setHWInfo(t *testing.T) {
+	// Create a new HubServer instance
+	hs := &HubServer{
+		hwInfos: map[int]*hwinfo.HWInfo{},
+	}
+
+	// Test case 1: set valid HWInfo
+	hwInfo := &hwinfo.HWInfo{GPUNames: []string{"NVIDIA GeForce GTX 1080 Ti"}}
+	hs.setHWInfo(1, hwInfo)
+	assert.Equal(t, hwInfo, hs.hwInfos[1])
+
+	// Test case 2: set nil HWInfo
+	hs.setHWInfo(1, nil)
+	assert.Nil(t, hs.hwInfos[1])
 }

@@ -31,6 +31,7 @@ var ErrAlreadyProcessing = errors.New("connection is already processing")
 var ErrRetry = errors.New("retry")
 
 type Connection struct {
+	agentID    int
 	agentToken *token.AgentToken
 	req        chan (*http.Request)
 	since      time.Time
@@ -40,11 +41,12 @@ type Connection struct {
 	respWriter *WriteCloser
 }
 
-func NewConnection(token *token.AgentToken) *Connection {
+func NewConnection(agentID int, token *token.AgentToken) *Connection {
 	return &Connection{
+		agentID:    agentID,
 		agentToken: token,
 		req:        make(chan (*http.Request)),
-		id:         rand.Int(),
+		id:         int(rand.Int63()),
 		since:      time.Now(),
 	}
 }
@@ -53,11 +55,15 @@ func (c *Connection) ID() int {
 	return c.id
 }
 
+func (c *Connection) AgentID() int {
+	return c.agentID
+}
+
 func (c *Connection) Since() time.Time {
 	return c.since
 }
 
-func (c *Connection) AgentID() int64 {
+func (c *Connection) TokenID() int64 {
 	return c.agentToken.GetId()
 }
 

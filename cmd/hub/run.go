@@ -20,7 +20,6 @@ import (
 	"net/http"
 
 	"github.com/hoveychen/slime/pkg/hub"
-	"github.com/hoveychen/slime/pkg/pool"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -40,8 +39,7 @@ var runCmd = &cobra.Command{
 			opts = append(opts, hub.WithConcurrent(concurrent))
 		}
 
-		pool := pool.NewPool()
-		hub := hub.NewHubServer(secret, pool, opts...)
+		hub := hub.NewHubServer(secret, opts...)
 
 		addr := fmt.Sprintf("%s:%d", host, port)
 		logrus.WithField("addr", addr).Info("Starting hub server")

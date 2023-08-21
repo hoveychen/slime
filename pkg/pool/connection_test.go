@@ -161,7 +161,7 @@ func TestConnection_Delegate(t *testing.T) {
 func TestNewConnection(t *testing.T) {
 	// Test that NewConnection returns a non-nil connection.
 	token := &token.AgentToken{}
-	conn := NewConnection(token)
+	conn := NewConnection(0, token)
 	if conn == nil {
 		t.Error("NewConnection() returned nil")
 	}
@@ -208,7 +208,7 @@ func TestConnection_AgentID(t *testing.T) {
 	// Test that AgentID returns the correct value.
 	token := &token.AgentToken{Id: 123}
 	conn := &Connection{agentToken: token}
-	if id := conn.AgentID(); id != 123 {
+	if id := conn.TokenID(); id != 123 {
 		t.Errorf("AgentID() = %d, want %d", id, 123)
 	}
 }

@@ -17,13 +17,16 @@ package hub
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"io"
 	"math/rand"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
+	"github.com/hoveychen/slime/pkg/hwinfo"
 	"github.com/hoveychen/slime/pkg/pool"
 	"github.com/hoveychen/slime/pkg/token"
 	"github.com/sirupsen/logrus"
@@ -35,6 +38,15 @@ type TokenManager interface {
 	Decrypt(string) (*token.AgentToken, error)
 }
 
+type ConnectionInfo struct {
+	AgentID      int
+	Since        time.Time
+	AgentName    string
+	ScopePaths   []string
+	Processing   bool
+	HardwareInfo *hwinfo.HWInfo
+}
+
 // Hub server is responsible for:
 // 1. Manage agents' connections
 // 2. Forward applications' request to the right agent
@@ -42,6 +54,8 @@ type HubServer struct {
 	tokenMgr   TokenManager
 	connPool   *pool.Pool
 	concurrent chan struct{}
+	mutex      sync.RWMutex
+	hwInfos    map[int]*hwinfo.HWInfo
 }
 
 type HubServerOption func(hs *HubServer)
@@ -52,10 +66,11 @@ func WithConcurrent(n int) HubServerOption {
 	}
 }
 
-func NewHubServer(secret string, connPool *pool.Pool, opts ...HubServerOption) *HubServer {
+func NewHubServer(secret string, opts ...HubServerOption) *HubServer {
 	hs := &HubServer{
 		tokenMgr: token.NewTokenManager([]byte(secret)),
-		connPool: connPool,
+		connPool: pool.NewPool(),
+		hwInfos:  make(map[int]*hwinfo.HWInfo),
 	}
 	for _, opt := range opts {
 		opt(hs)
@@ -161,42 +176,91 @@ func (hs *HubServer) wrapTokenValidator(h http.Handler) http.Handler {
 			}
 		}
 
+		_, err = strconv.Atoi(r.Header.Get("slime-agent-id"))
+		if err != nil {
+			hs.error(w, agentLog, err, "Failed to parse node id")
+			return
+		}
+
 		r = r.WithContext(token.NewContext(r.Context(), tok))
 
 		h.ServeHTTP(w, r)
 	})
 }
 
+func (hs *HubServer) GetHWInfo(agentID int) *hwinfo.HWInfo {
+	hs.mutex.RLock()
+	defer hs.mutex.RUnlock()
+	return hs.hwInfos[agentID]
+}
+
+func (hs *HubServer) setHWInfo(agentID int, hwInfo *hwinfo.HWInfo) {
+	hs.mutex.Lock()
+	defer hs.mutex.Unlock()
+	if hwInfo == nil {
+		delete(hs.hwInfos, agentID)
+		return
+	}
+	hs.hwInfos[agentID] = hwInfo
+}
+
+func (hs *HubServer) GetConnectionsInfos() []*ConnectionInfo {
+	var connectionsInfos []*ConnectionInfo
+
+	conns := hs.connPool.GetPendingConnections()
+	conns = append(conns, hs.connPool.GetProcessingConnections()...)
+
+	for _, conn := range conns {
+		connectionsInfos = append(connectionsInfos, &ConnectionInfo{
+			AgentName:    conn.AgentName(),
+			AgentID:      conn.AgentID(),
+			Since:        conn.Since(),
+			ScopePaths:   conn.ScopePaths(),
+			Processing:   conn.IsProcessing(),
+			HardwareInfo: hs.GetHWInfo(conn.AgentID()),
+		})
+	}
+	return connectionsInfos
+}
+
 func (hs *HubServer) handleAgentJoin(w http.ResponseWriter, r *http.Request) {
+	agentID, _ := strconv.Atoi(r.Header.Get("slime-agent-id"))
 	token := token.FromContext(r.Context())
 	agentLog := logrus.WithFields(logrus.Fields{
-		"remote":     r.RemoteAddr,
-		"agent_id":   token.GetId(),
-		"agent_name": token.GetName(),
+		"remote":  r.RemoteAddr,
+		"agent":   token.GetName(),
+		"agentID": agentID,
 	})
+
+	var hwInfo hwinfo.HWInfo
+	json.NewDecoder(r.Body).Decode(&hwInfo)
+	hs.setHWInfo(agentID, &hwInfo)
 	agentLog.Info("Agent has arrived.")
 }
 
 func (hs *HubServer) handleAgentLeave(w http.ResponseWriter, r *http.Request) {
+	agentID, _ := strconv.Atoi(r.Header.Get("slime-agent-id"))
 	token := token.FromContext(r.Context())
 	agentLog := logrus.WithFields(logrus.Fields{
-		"remote":     r.RemoteAddr,
-		"agent_id":   token.GetId(),
-		"agent_name": token.GetName(),
+		"remote":  r.RemoteAddr,
+		"agent":   token.GetName(),
+		"agentID": agentID,
 	})
+	hs.setHWInfo(agentID, nil)
 	agentLog.Info("Agent has left.")
 }
 
 func (hs *HubServer) handleAgentAccept(w http.ResponseWriter, r *http.Request) {
+	agentID, _ := strconv.Atoi(r.Header.Get("slime-agent-id"))
 	token := token.FromContext(r.Context())
 	agentLog := logrus.WithFields(logrus.Fields{
-		"remote":     r.RemoteAddr,
-		"agent_id":   token.GetId(),
-		"agent_name": token.GetName(),
+		"remote":  r.RemoteAddr,
+		"agent":   token.GetName(),
+		"agentID": agentID,
 	})
 
 	agentLog.Info("Agent is listening...")
-	conn := pool.NewConnection(token)
+	conn := pool.NewConnection(agentID, token)
 	hs.connPool.AddConnection(conn)
 	// Blocking, wait for a new job
 	req := conn.Accept(r.Context())
@@ -226,11 +290,12 @@ func (hs *HubServer) handleAgentAccept(w http.ResponseWriter, r *http.Request) {
 }
 
 func (hs *HubServer) handleAgentSubmit(w http.ResponseWriter, r *http.Request) {
+	agentID, _ := strconv.Atoi(r.Header.Get("slime-agent-id"))
 	token := token.FromContext(r.Context())
 	agentLog := logrus.WithFields(logrus.Fields{
-		"remote":     r.RemoteAddr,
-		"agent_id":   token.GetId(),
-		"agent_name": token.GetName(),
+		"remote":  r.RemoteAddr,
+		"agent":   token.GetName(),
+		"agentID": agentID,
 	})
 
 	connectionID, err := strconv.Atoi(r.Header.Get("slime-connection-id"))
@@ -245,7 +310,7 @@ func (hs *HubServer) handleAgentSubmit(w http.ResponseWriter, r *http.Request) {
 		hs.error(w, agentLog, nil, "Connection not found")
 		return
 	}
-	if conn.AgentID() != token.GetId() {
+	if conn.TokenID() != token.GetId() {
 		hs.error(w, agentLog, nil, "Agent ID mismatch")
 		return
 	}
@@ -285,6 +350,6 @@ func (hs *HubServer) handleAgentSubmit(w http.ResponseWriter, r *http.Request) {
 	submitter.WriteHeader(upResp.StatusCode)
 	io.Copy(submitter, upResp.Body)
 
-	agentLog.WithField("content_length", upResp.ContentLength).Info("Agent submitted.")
+	agentLog.WithField("contentLength", upResp.ContentLength).Info("Agent submitted.")
 	w.WriteHeader(http.StatusOK)
 }
