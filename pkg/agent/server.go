@@ -47,7 +47,6 @@ type AgentServer struct {
 	token       string
 	upstreamURL *url.URL
 	hubURL      *url.URL
-	agentID     int
 	hwInfo      *hwinfo.HWInfo
 }
 
@@ -69,7 +68,6 @@ func NewAgentServer(hubAddr, upstreamAddr, token string, opts ...AgentServerOpti
 		hubURL:      hubURL,
 		upstreamURL: upstreamURL,
 		reportHW:    true,
-		agentID:     int(rand.Int63()),
 	}
 	for _, opt := range opts {
 		opt(as)
@@ -125,28 +123,29 @@ func parseAddr(addr string) (*url.URL, error) {
 }
 
 func (as *AgentServer) Run(ctx context.Context) error {
-	// connect to hub to ensure the hub address and token is correct.
-	if err := as.joinHub(ctx); err != nil {
-		return err
-	}
 
 	grp, ctx := errgroup.WithContext(ctx)
 	for i := 0; i < as.numWorker; i++ {
 		workerNum := i
 		grp.Go(func() error {
-			return as.runWorker(ctx, workerNum)
+			agentID := int(rand.Int63())
+			// connect to hub to ensure the hub address and token is correct.
+			if err := as.joinHub(ctx, agentID); err != nil {
+				return err
+			}
+			return as.runWorker(ctx, agentID, workerNum)
 		})
 	}
 
 	return grp.Wait()
 }
 
-func (as *AgentServer) newHubAPIRequest(ctx context.Context, apiPath string, reader io.Reader) *http.Request {
+func (as *AgentServer) newHubAPIRequest(ctx context.Context, agentID int, apiPath string, reader io.Reader) *http.Request {
 	u := *as.hubURL
 	u.Path = path.Join(u.Path, apiPath)
 	req, _ := http.NewRequest("POST", u.String(), reader)
 	req.Header.Set("slime-agent-token", as.token)
-	req.Header.Set("slime-agent-id", strconv.Itoa(as.agentID))
+	req.Header.Set("slime-agent-id", strconv.Itoa(agentID))
 	return req
 }
 
@@ -158,7 +157,7 @@ func (as *AgentServer) fixUpstreamRequest(r *http.Request) {
 	r.RequestURI = ""
 }
 
-func (as *AgentServer) joinHub(ctx context.Context) error {
+func (as *AgentServer) joinHub(ctx context.Context, agentID int) error {
 	var body io.Reader
 	if as.hwInfo != nil {
 		json, err := json.Marshal(as.hwInfo)
@@ -167,7 +166,7 @@ func (as *AgentServer) joinHub(ctx context.Context) error {
 		}
 		body = bufio.NewReader(bytes.NewReader(json))
 	}
-	req := as.newHubAPIRequest(ctx, hub.PathJoin, body)
+	req := as.newHubAPIRequest(ctx, agentID, hub.PathJoin, body)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -181,13 +180,13 @@ func (as *AgentServer) joinHub(ctx context.Context) error {
 	return nil
 }
 
-func (as *AgentServer) runWorker(ctx context.Context, workerNum int) error {
+func (as *AgentServer) runWorker(ctx context.Context, agentID int, workerNum int) error {
 	log := logrus.WithField("worker", workerNum)
 	backoffDuration := time.Second
 	for ctx.Err() == nil {
 		var connectionID string
 		upstreamErr := func() error {
-			acceptReq := as.newHubAPIRequest(ctx, hub.PathAccept, nil)
+			acceptReq := as.newHubAPIRequest(ctx, agentID, hub.PathAccept, nil)
 			acceptResp, err := http.DefaultClient.Do(acceptReq)
 			if err != nil {
 				log.WithError(err).Warnf("Listening... Retry in %s", backoffDuration)
@@ -231,7 +230,7 @@ func (as *AgentServer) runWorker(ctx context.Context, workerNum int) error {
 			}).Info("Upstream responsed")
 
 			pr, pw := io.Pipe()
-			submitReq := as.newHubAPIRequest(ctx, hub.PathSubmit, pr)
+			submitReq := as.newHubAPIRequest(ctx, agentID, hub.PathSubmit, pr)
 			submitReq.Header.Set("slime-connection-id", connectionID)
 
 			go func() {
@@ -257,7 +256,7 @@ func (as *AgentServer) runWorker(ctx context.Context, workerNum int) error {
 
 		if upstreamErr != nil {
 			// Need to submit the error result.
-			submitReq := as.newHubAPIRequest(ctx, hub.PathSubmit, nil)
+			submitReq := as.newHubAPIRequest(ctx, agentID, hub.PathSubmit, nil)
 			submitReq.Header.Set("slime-connection-id", connectionID)
 			submitReq.Header.Set("slime-upstream-error", upstreamErr.Error())
 			submitResp, err := http.DefaultClient.Do(submitReq)

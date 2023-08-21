@@ -28,6 +28,7 @@ import (
 
 var ErrNotProcessing = errors.New("connection is not processing")
 var ErrAlreadyProcessing = errors.New("connection is already processing")
+var ErrAgentAlreadyConnected = errors.New("agent is already connected")
 var ErrRetry = errors.New("retry")
 
 type Connection struct {

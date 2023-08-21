@@ -51,11 +51,12 @@ type ConnectionInfo struct {
 // 1. Manage agents' connections
 // 2. Forward applications' request to the right agent
 type HubServer struct {
-	tokenMgr   TokenManager
-	connPool   *pool.Pool
-	concurrent chan struct{}
-	mutex      sync.RWMutex
-	hwInfos    map[int]*hwinfo.HWInfo
+	tokenMgr    TokenManager
+	connPool    *pool.Pool
+	concurrent  chan struct{}
+	mutex       sync.RWMutex
+	hwInfos     map[int]*hwinfo.HWInfo
+	appPassword string
 }
 
 type HubServerOption func(hs *HubServer)
@@ -63,6 +64,12 @@ type HubServerOption func(hs *HubServer)
 func WithConcurrent(n int) HubServerOption {
 	return func(hs *HubServer) {
 		hs.concurrent = make(chan struct{}, n)
+	}
+}
+
+func WithAppPassword(password string) HubServerOption {
+	return func(hs *HubServer) {
+		hs.appPassword = password
 	}
 }
 
@@ -105,6 +112,11 @@ func (hs *HubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (hs *HubServer) handleAppRequest(w http.ResponseWriter, r *http.Request) {
+	if hs.appPassword != "" && r.Header.Get("slime-app-password") != hs.appPassword {
+		hs.replyStatus(w, logrus.WithField("remote", r.RemoteAddr), http.StatusUnauthorized, "Unauthorized", "Invalid password")
+		return
+	}
+
 	if hs.concurrent != nil {
 		hs.concurrent <- struct{}{}
 		defer func() {
@@ -140,7 +152,7 @@ func (hs *HubServer) handleAppRequest(w http.ResponseWriter, r *http.Request) {
 
 		// No connections meet the request.
 		if r.Header.Get("slime-block") == "" {
-			hs.error(w, logrus.WithField("remote", r.RemoteAddr), nil, "No available agent")
+			hs.replyStatus(w, logrus.WithField("remote", r.RemoteAddr), http.StatusServiceUnavailable, "No available agent", "No available agent")
 			return
 		}
 		time.Sleep(1 * time.Second)
@@ -148,13 +160,21 @@ func (hs *HubServer) handleAppRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (hs *HubServer) error(w http.ResponseWriter, log *logrus.Entry, err error, msg string) {
-	w.WriteHeader(http.StatusUnauthorized)
-	w.Write([]byte("Unauthorized"))
+	w.WriteHeader(http.StatusInternalServerError)
+	w.Write([]byte(msg))
 	if log != nil {
 		if err != nil {
 			log = log.WithError(err)
 		}
 		log.Error(msg)
+	}
+}
+
+func (hs *HubServer) replyStatus(w http.ResponseWriter, log *logrus.Entry, statusCode int, statusMsg, explainMsg string) {
+	w.WriteHeader(statusCode)
+	w.Write([]byte(statusMsg))
+	if log != nil {
+		log.Warn(explainMsg)
 	}
 }
 
@@ -164,21 +184,21 @@ func (hs *HubServer) wrapTokenValidator(h http.Handler) http.Handler {
 		encryptedToken := r.Header.Get("slime-agent-token")
 		tok, err := hs.tokenMgr.Decrypt(encryptedToken)
 		if err != nil {
-			hs.error(w, agentLog, err, "Failed to decrypt token")
+			hs.replyStatus(w, agentLog, http.StatusUnauthorized, "Unauthorized", "Failed to decrypt token")
 			return
 		}
 
 		if tok.ExpireAt > 0 {
 			expireAt := time.Unix(tok.ExpireAt, 0)
 			if time.Now().After(expireAt) {
-				hs.error(w, agentLog, err, "Token expired")
+				hs.replyStatus(w, agentLog, http.StatusUnauthorized, "Unauthorized", "Token expired")
 				return
 			}
 		}
 
 		_, err = strconv.Atoi(r.Header.Get("slime-agent-id"))
 		if err != nil {
-			hs.error(w, agentLog, err, "Failed to parse node id")
+			hs.replyStatus(w, agentLog, http.StatusUnauthorized, "Unauthorized", "Failed to parse node id")
 			return
 		}
 
@@ -260,6 +280,22 @@ func (hs *HubServer) handleAgentAccept(w http.ResponseWriter, r *http.Request) {
 	})
 
 	agentLog.Info("Agent is listening...")
+	// Check if there is any existing connection by the agent.
+	// Terminate the existing connection if there is any.
+	existings := hs.connPool.GetPendingConnections()
+	existings = append(existings, hs.connPool.GetProcessingConnections()...)
+
+	for _, conn := range existings {
+		if conn.AgentID() != agentID {
+			continue
+		}
+		if err := conn.SubmitError(r.Context(), pool.ErrAgentAlreadyConnected); err != nil {
+			agentLog.WithError(err).Error("Failed to terminate the connection")
+		} else {
+			agentLog.WithField("connectionID", conn.ID()).Warn("Agent already connected. Terminating the existing connection.")
+		}
+	}
+
 	conn := pool.NewConnection(agentID, token)
 	hs.connPool.AddConnection(conn)
 	// Blocking, wait for a new job

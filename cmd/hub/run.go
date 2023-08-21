@@ -26,17 +26,21 @@ import (
 
 // runCmd represents the run command
 var runCmd = &cobra.Command{
-	Use:   "run --secret <secret>",
+	Use:   "run --secret <secret> --appPassword <appPassword>",
 	Short: "Run a hub server.",
 	Long:  `A hub server accepts http requests, and forwards the requests to the agents.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		secret := cmd.Flag("secret").Value.String()
+		appPassword := cmd.Flag("appPassword").Value.String()
 		host := cmd.Flag("host").Value.String()
 		port, _ := cmd.Flags().GetInt("port")
 
 		var opts []hub.HubServerOption
 		if concurrent, err := cmd.Flags().GetInt("concurrent"); err == nil && concurrent > 0 {
 			opts = append(opts, hub.WithConcurrent(concurrent))
+		}
+		if appPassword != "" {
+			opts = append(opts, hub.WithAppPassword(appPassword))
 		}
 
 		hub := hub.NewHubServer(secret, opts...)
@@ -54,6 +58,7 @@ func init() {
 	HubCmd.AddCommand(runCmd)
 
 	// Here you will define your flags and configuration settings.
+	runCmd.PersistentFlags().String("appPassword", "", "The password for the application to connect to the hub")
 	runCmd.PersistentFlags().Int("port", 8080, "Port to listen on")
 	runCmd.PersistentFlags().String("host", "0.0.0.0", "Host to listen on")
 	runCmd.PersistentFlags().Int("concurrent", 0, "The number of concurrent requests from the applications")

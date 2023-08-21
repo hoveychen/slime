@@ -54,7 +54,12 @@ Next, execute the hub server using the following command:
 ```bash
 slime hub run --secret <secret>
 ```
-> It is recommended to set the `concurrent` flag to a reasonable value (e.g., `1024`) in a production environment, in addition to the explicit flags binding the `host` and `port` configurations. This helps to mitigate potential Distributed Denial of Service (DDoS) attacks.
+> [!NOTE]
+> 1. It is recommended to set the `concurrent` flag to a reasonable value (e.g., `1024`) in a production environment, in addition to the explicit flags binding the `host` and `port` configurations. This helps to mitigate potential Distributed Denial of Service (DDoS) attacks.
+> 2. If the hub is hosting on the Internet, make sure the network between the hub, applications and agents are in absolute safe. Here are some common practices:
+>    * Host the hub behind a *HTTPS* proxy, like Nginx, HAProxy.
+>    * Setup (Web Application Firewall) WAF to keep the hub safe.
+>    * Set `appPassword` flag to require the application to authenticate.
 
 ### Agent Configuration
 Firstly, generate an *Agent Token* for the agent to access the hub. This can be done using the following command:
@@ -74,6 +79,12 @@ slime agent run --token <agent token> --hub <hub address> --upstream <upstream a
 
 > [!NOTE]
 > The default configuration assumes that the service provider operates in a single-threaded mode (e.g., heavy-load generative AI tasks using GPU). If this is not the case, you can increase the degree of parallelism by specifying the `numWorker` flag.
+
+### Application request
+The downstream applications are free to invoke the hub with any HTTP request. 
+
+* If the hub has been setup to require an `appPassword`, the application HTTP request should include a header `Slime-App-Password`.
+* The requests are then forwarded to the remote service providers if any available. If there are no service providers, status `503 Service Unavailable` will be returned. Including a HTTP header `Slime-Block: 1` will block the request until service providers become available.
 
 ## Contributing
 Contributions are welcome. Feel free to open issues and submit merge requests.

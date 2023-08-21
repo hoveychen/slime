@@ -111,7 +111,7 @@ func TestNewHubAPIRequest(t *testing.T) {
 	// Create a new hub API request with a mock API path and reader.
 	apiPath := "/api/v1/test"
 	reader := strings.NewReader("test")
-	req := as.newHubAPIRequest(context.Background(), apiPath, reader)
+	req := as.newHubAPIRequest(context.Background(), 123, apiPath, reader)
 
 	// Check that the request method is "POST".
 	if req.Method != "POST" {
@@ -270,7 +270,7 @@ func TestJoinHubSuccess(t *testing.T) {
 	as.hubURL, _ = url.Parse(mockServer.URL)
 
 	// Call the joinHub method.
-	err := as.joinHub(context.Background())
+	err := as.joinHub(context.Background(), 123)
 
 	// Check that the error is nil.
 	if err != nil {
@@ -295,7 +295,7 @@ func TestJoinHubError(t *testing.T) {
 	as.hubURL, _ = url.Parse(mockServer.URL)
 
 	// Call the joinHub method.
-	err := as.joinHub(context.Background())
+	err := as.joinHub(context.Background(), 123)
 
 	// Check that the error is not nil.
 	if err == nil {
@@ -320,7 +320,7 @@ func TestJoinHubHTTPError(t *testing.T) {
 	as.hubURL, _ = url.Parse(mockServer.URL)
 
 	// Call the joinHub method.
-	err := as.joinHub(context.Background())
+	err := as.joinHub(context.Background(), 123)
 
 	// Check that the error is not nil.
 	if err == nil {
