@@ -111,6 +111,12 @@ func (c *Connection) SubmitError(ctx context.Context, err error) error {
 	return nil
 }
 
+func (c *Connection) Close(err error) error {
+	c.err.Store(err)
+	c.respWriter.Close()
+	return nil
+}
+
 func (c *Connection) Delegate(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
 	processing := c.processing.Swap(true)
 	if processing {

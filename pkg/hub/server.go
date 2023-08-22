@@ -23,7 +23,6 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/hoveychen/slime/pkg/hwinfo"
@@ -54,8 +53,7 @@ type HubServer struct {
 	tokenMgr    TokenManager
 	connPool    *pool.Pool
 	concurrent  chan struct{}
-	mutex       sync.RWMutex
-	hwInfos     map[int]*hwinfo.HWInfo
+	catalog     Catalog
 	appPassword string
 }
 
@@ -73,14 +71,22 @@ func WithAppPassword(password string) HubServerOption {
 	}
 }
 
+func WithCatalog(c Catalog) HubServerOption {
+	return func(hs *HubServer) {
+		hs.catalog = c
+	}
+}
+
 func NewHubServer(secret string, opts ...HubServerOption) *HubServer {
 	hs := &HubServer{
 		tokenMgr: token.NewTokenManager([]byte(secret)),
 		connPool: pool.NewPool(),
-		hwInfos:  make(map[int]*hwinfo.HWInfo),
 	}
 	for _, opt := range opts {
 		opt(hs)
+	}
+	if hs.catalog == nil {
+		hs.catalog = NewMemoryCatalog()
 	}
 	return hs
 }
@@ -92,8 +98,6 @@ func (hs *HubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PathJoin:
 			handler = http.HandlerFunc(hs.handleAgentJoin)
-		case PathLeave:
-			handler = http.HandlerFunc(hs.handleAgentLeave)
 		case PathAccept:
 			handler = http.HandlerFunc(hs.handleAgentAccept)
 		case PathSubmit:
@@ -208,22 +212,6 @@ func (hs *HubServer) wrapTokenValidator(h http.Handler) http.Handler {
 	})
 }
 
-func (hs *HubServer) GetHWInfo(agentID int) *hwinfo.HWInfo {
-	hs.mutex.RLock()
-	defer hs.mutex.RUnlock()
-	return hs.hwInfos[agentID]
-}
-
-func (hs *HubServer) setHWInfo(agentID int, hwInfo *hwinfo.HWInfo) {
-	hs.mutex.Lock()
-	defer hs.mutex.Unlock()
-	if hwInfo == nil {
-		delete(hs.hwInfos, agentID)
-		return
-	}
-	hs.hwInfos[agentID] = hwInfo
-}
-
 func (hs *HubServer) GetConnectionsInfos() []*ConnectionInfo {
 	var connectionsInfos []*ConnectionInfo
 
@@ -237,7 +225,7 @@ func (hs *HubServer) GetConnectionsInfos() []*ConnectionInfo {
 			Since:        conn.Since(),
 			ScopePaths:   conn.ScopePaths(),
 			Processing:   conn.IsProcessing(),
-			HardwareInfo: hs.GetHWInfo(conn.AgentID()),
+			HardwareInfo: hs.catalog.GetHardwareInfo(conn.AgentID()),
 		})
 	}
 	return connectionsInfos
@@ -254,20 +242,8 @@ func (hs *HubServer) handleAgentJoin(w http.ResponseWriter, r *http.Request) {
 
 	var hwInfo hwinfo.HWInfo
 	json.NewDecoder(r.Body).Decode(&hwInfo)
-	hs.setHWInfo(agentID, &hwInfo)
+	hs.catalog.SetHardwareInfo(agentID, &hwInfo)
 	agentLog.Info("Agent has arrived.")
-}
-
-func (hs *HubServer) handleAgentLeave(w http.ResponseWriter, r *http.Request) {
-	agentID, _ := strconv.Atoi(r.Header.Get("slime-agent-id"))
-	token := token.FromContext(r.Context())
-	agentLog := logrus.WithFields(logrus.Fields{
-		"remote":  r.RemoteAddr,
-		"agent":   token.GetName(),
-		"agentID": agentID,
-	})
-	hs.setHWInfo(agentID, nil)
-	agentLog.Info("Agent has left.")
 }
 
 func (hs *HubServer) handleAgentAccept(w http.ResponseWriter, r *http.Request) {
@@ -289,7 +265,7 @@ func (hs *HubServer) handleAgentAccept(w http.ResponseWriter, r *http.Request) {
 		if conn.AgentID() != agentID {
 			continue
 		}
-		if err := conn.SubmitError(r.Context(), pool.ErrAgentAlreadyConnected); err != nil {
+		if err := conn.Close(pool.ErrAgentAlreadyConnected); err != nil {
 			agentLog.WithError(err).Error("Failed to terminate the connection")
 		} else {
 			agentLog.WithField("connectionID", conn.ID()).Warn("Agent already connected. Terminating the existing connection.")
@@ -311,8 +287,8 @@ func (hs *HubServer) handleAgentAccept(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("slime-connection-id", strconv.Itoa(conn.ID()))
 	w.WriteHeader(http.StatusOK)
 	if err := req.Write(w); err != nil {
-		if err := conn.SubmitError(r.Context(), errors.Join(err, pool.ErrRetry)); err != nil {
-			agentLog.WithError(err).Error("Failed to submit error")
+		if err := conn.Close(errors.Join(err, pool.ErrRetry)); err != nil {
+			agentLog.WithError(err).Error("Failed to close connection")
 		}
 		hs.connPool.RemoveConnection(conn)
 		agentLog.WithError(err).Error("Failed to serialize request")
@@ -373,8 +349,8 @@ func (hs *HubServer) handleAgentSubmit(w http.ResponseWriter, r *http.Request) {
 
 	upResp, err := http.ReadResponse(bufio.NewReader(r.Body), nil)
 	if err != nil {
-		if err := conn.SubmitError(r.Context(), err); err != nil {
-			agentLog.WithError(err).Error("Failed to submit error")
+		if err := conn.Close(err); err != nil {
+			agentLog.WithError(err).Error("Failed to close connection")
 		}
 		hs.error(w, agentLog, err, "Read upstream response")
 		return

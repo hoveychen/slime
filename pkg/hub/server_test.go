@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hoveychen/slime/pkg/hwinfo"
 	"github.com/hoveychen/slime/pkg/token"
 	"github.com/stretchr/testify/assert"
 )
@@ -130,7 +129,7 @@ func TestNewHubServer(t *testing.T) {
 func TestHandleAgentJoin(t *testing.T) {
 	// Create a mock HubServer
 	hs := &HubServer{
-		hwInfos: make(map[int]*hwinfo.HWInfo),
+		catalog: NewMemoryCatalog(),
 	}
 
 	// Create a mock request with a context containing a valid token
@@ -152,66 +151,4 @@ func TestHandleAgentJoin(t *testing.T) {
 	if status := rr.Code; status != http.StatusOK {
 		t.Errorf("handleAgentJoin returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
-}
-
-func TestHandleAgentLeave(t *testing.T) {
-	// Create a mock HubServer
-	hs := &HubServer{
-		hwInfos: make(map[int]*hwinfo.HWInfo),
-	}
-
-	// Create a mock request with a context containing a valid token
-	req := httptest.NewRequest("GET", "/", nil)
-	ctx := req.Context()
-	ctx = token.NewContext(ctx, &token.AgentToken{
-		Id:   123,
-		Name: "test-agent",
-	})
-	req = req.WithContext(ctx)
-
-	// Create a mock response recorder
-	rr := httptest.NewRecorder()
-
-	// Call the handleAgentJoin method
-	hs.handleAgentLeave(rr, req)
-
-	// Check that the response status code is 200
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handleAgentLeave returned wrong status code: got %v want %v", status, http.StatusOK)
-	}
-}
-
-func TestHubServer_GetHWInfo(t *testing.T) {
-	// Create a new HubServer instance
-	hs := &HubServer{
-		hwInfos: map[int]*hwinfo.HWInfo{
-			1: {GPUNames: []string{"NVIDIA GeForce GTX 1080 Ti"}},
-			2: {GPUNames: []string{"NVIDIA GeForce GTX 1080"}},
-		},
-	}
-
-	// Test case 1: valid node ID
-	hwInfo := hs.GetHWInfo(1)
-	assert.NotNil(t, hwInfo)
-	assert.Equal(t, []string{"NVIDIA GeForce GTX 1080 Ti"}, hwInfo.GPUNames)
-
-	// Test case 2: invalid node ID
-	hwInfo = hs.GetHWInfo(3)
-	assert.Nil(t, hwInfo)
-}
-
-func TestHubServer_setHWInfo(t *testing.T) {
-	// Create a new HubServer instance
-	hs := &HubServer{
-		hwInfos: map[int]*hwinfo.HWInfo{},
-	}
-
-	// Test case 1: set valid HWInfo
-	hwInfo := &hwinfo.HWInfo{GPUNames: []string{"NVIDIA GeForce GTX 1080 Ti"}}
-	hs.setHWInfo(1, hwInfo)
-	assert.Equal(t, hwInfo, hs.hwInfos[1])
-
-	// Test case 2: set nil HWInfo
-	hs.setHWInfo(1, nil)
-	assert.Nil(t, hs.hwInfos[1])
 }
