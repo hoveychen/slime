@@ -31,6 +31,9 @@ var runCmd = &cobra.Command{
 	Long:  `A hub server accepts http requests, and forwards the requests to the agents.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		secret := cmd.Flag("secret").Value.String()
+		if secret == "" {
+			logrus.Fatal("secret is required")
+		}
 		appPassword := cmd.Flag("appPassword").Value.String()
 		host := cmd.Flag("host").Value.String()
 		port, _ := cmd.Flags().GetInt("port")

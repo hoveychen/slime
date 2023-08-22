@@ -29,8 +29,17 @@ var runCmd = &cobra.Command{
 	Long:  `An agent server is a server that can be used to proxy the traffic to the upstream server.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		token := cmd.Flag("token").Value.String()
+		if token == "" {
+			logrus.Fatal("No token is provided")
+		}
 		hub := cmd.Flag("hub").Value.String()
+		if hub == "" {
+			logrus.Fatal("No hub address is provided")
+		}
 		upstreams, _ := cmd.PersistentFlags().GetStringSlice("upstream")
+		if len(upstreams) == 0 {
+			logrus.Fatal("No upstream address is provided")
+		}
 		reportHardware, _ := cmd.PersistentFlags().GetBool("reportHardware")
 
 		var opts []agent.AgentServerOption
@@ -65,7 +74,6 @@ func init() {
 
 	// Here you will define your flags and configuration settings.
 	runCmd.PersistentFlags().StringSlice("upstream", nil, "The upstream address")
-	runCmd.MarkPersistentFlagRequired("upstream")
 	runCmd.PersistentFlags().Int("numWorker", 1, "The number of workers to handle the requests")
 	runCmd.PersistentFlags().Bool("reportHardware", true, "Report the hardware information to the hub")
 }

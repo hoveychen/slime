@@ -29,5 +29,4 @@ var HubCmd = &cobra.Command{
 func init() {
 	// Here you will define your flags and configuration settings.
 	HubCmd.PersistentFlags().String("secret", "", "The secret key for the hub communicate with the agent")
-	HubCmd.MarkPersistentFlagRequired("secret")
 }

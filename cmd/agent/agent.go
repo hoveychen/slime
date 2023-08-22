@@ -31,7 +31,5 @@ func init() {
 	// Here you will define your flags and configuration settings.
 
 	AgentCmd.PersistentFlags().String("token", "", "The agent token for the agent to communicate with the hub")
-	AgentCmd.MarkPersistentFlagRequired("token")
 	AgentCmd.PersistentFlags().String("hub", "", "The hub address")
-	AgentCmd.MarkPersistentFlagRequired("hub")
 }

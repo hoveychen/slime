@@ -18,9 +18,11 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/hoveychen/slime/cmd/agent"
 	"github.com/hoveychen/slime/cmd/hub"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,6 +42,20 @@ var rootCmd = &cobra.Command{
 	// Run: func(cmd *cobra.Command, args []string) { },
 }
 
+// versionCmd represents the version command
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Display the build version",
+	Run: func(cmd *cobra.Command, args []string) {
+		info, ok := debug.ReadBuildInfo()
+		if !ok {
+			logrus.Error("Failed to read build info")
+			return
+		}
+		fmt.Println(info.Main.Version)
+	},
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -52,6 +68,7 @@ func Execute() {
 func init() {
 	rootCmd.AddCommand(hub.HubCmd)
 	rootCmd.AddCommand(agent.AgentCmd)
+	rootCmd.AddCommand(versionCmd)
 	cobra.OnInitialize(initConfig)
 
 	// Here you will define your flags and configuration settings.

@@ -36,6 +36,9 @@ var registerCmd = &cobra.Command{
 		age, _ := cmd.Flags().GetDuration("age")
 		scopePaths, _ := cmd.Flags().GetStringSlice("scopePaths")
 		secret := cmd.Flag("secret").Value.String()
+		if secret == "" {
+			logrus.Fatal("The secret is required")
+		}
 
 		if name == "" {
 			// generate a random name
