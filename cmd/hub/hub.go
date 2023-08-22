@@ -17,6 +17,7 @@ package hub
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // hubCmd represents the hub command
@@ -29,4 +30,5 @@ var HubCmd = &cobra.Command{
 func init() {
 	// Here you will define your flags and configuration settings.
 	HubCmd.PersistentFlags().String("secret", "", "The secret key for the hub communicate with the agent")
+	viper.BindPFlags(HubCmd.PersistentFlags())
 }

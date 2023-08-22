@@ -24,6 +24,7 @@ import (
 	"github.com/hoveychen/slime/pkg/token"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // registerCmd represents the register command
@@ -32,10 +33,10 @@ var registerCmd = &cobra.Command{
 	Short: "Register an agent, and get an agent token for the agent to communicate with the hub",
 	Long:  `The agent token is the only way to authenticate an agent to the hub.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		name := cmd.Flag("name").Value.String()
-		age, _ := cmd.Flags().GetDuration("age")
-		scopePaths, _ := cmd.Flags().GetStringSlice("scopePaths")
-		secret := cmd.Flag("secret").Value.String()
+		name := viper.GetString("name")
+		age := viper.GetDuration("age")
+		scopePaths := viper.GetStringSlice("scopePaths")
+		secret := viper.GetString("secret")
 		if secret == "" {
 			logrus.Fatal("The secret is required")
 		}
@@ -71,4 +72,5 @@ func init() {
 	registerCmd.PersistentFlags().String("name", "", "The agent name")
 	registerCmd.PersistentFlags().Duration("age", 0, "When specified, the token will be expired after the specified age. format like '1h2m3s'")
 	registerCmd.PersistentFlags().StringSlice("scopePaths", []string{}, "When specified, the agent accepts only the scoped paths")
+	viper.BindPFlags(registerCmd.PersistentFlags())
 }

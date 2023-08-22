@@ -19,6 +19,7 @@ import (
 	"github.com/hoveychen/slime/pkg/agent"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -28,30 +29,30 @@ var runCmd = &cobra.Command{
 	Short: "Run a agent server.",
 	Long:  `An agent server is a server that can be used to proxy the traffic to the upstream server.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		token := cmd.Flag("token").Value.String()
+		token := viper.GetString("token")
 		if token == "" {
 			logrus.Fatal("No token is provided")
 		}
-		hub := cmd.Flag("hub").Value.String()
+		hub := viper.GetString("hub")
 		if hub == "" {
 			logrus.Fatal("No hub address is provided")
 		}
-		upstreams, _ := cmd.PersistentFlags().GetStringSlice("upstream")
+		upstreams := viper.GetStringSlice("upstream")
 		if len(upstreams) == 0 {
 			logrus.Fatal("No upstream address is provided")
 		}
-		reportHardware, _ := cmd.PersistentFlags().GetBool("reportHardware")
 
 		var opts []agent.AgentServerOption
-		if numWorker, err := cmd.Flags().GetInt("numWorker"); err == nil && numWorker > 1 {
+		if numWorker := viper.GetInt("numWorker"); numWorker > 1 {
 			opts = append(opts, agent.WithNumWorker(numWorker))
 		}
-		if !reportHardware {
+		if !viper.GetBool("reportHardware") {
 			opts = append(opts, agent.WithReportHardware(false))
 		}
 
 		grp, ctx := errgroup.WithContext(cmd.Context())
 		for _, upstream := range upstreams {
+			upstream := upstream
 			logrus.WithField("upstream", upstream).Info("Starting agent for upstream")
 			agent, err := agent.NewAgentServer(hub, upstream, token, opts...)
 			if err != nil {
@@ -76,4 +77,5 @@ func init() {
 	runCmd.PersistentFlags().StringSlice("upstream", nil, "The upstream address")
 	runCmd.PersistentFlags().Int("numWorker", 1, "The number of workers to handle the requests")
 	runCmd.PersistentFlags().Bool("reportHardware", true, "Report the hardware information to the hub")
+	viper.BindPFlags(runCmd.PersistentFlags())
 }

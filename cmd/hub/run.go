@@ -22,6 +22,7 @@ import (
 	"github.com/hoveychen/slime/pkg/hub"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // runCmd represents the run command
@@ -30,19 +31,19 @@ var runCmd = &cobra.Command{
 	Short: "Run a hub server.",
 	Long:  `A hub server accepts http requests, and forwards the requests to the agents.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		secret := cmd.Flag("secret").Value.String()
+		secret := viper.GetString("secret")
 		if secret == "" {
 			logrus.Fatal("secret is required")
 		}
-		appPassword := cmd.Flag("appPassword").Value.String()
-		host := cmd.Flag("host").Value.String()
-		port, _ := cmd.Flags().GetInt("port")
+
+		host := viper.GetString("host")
+		port := viper.GetInt("port")
 
 		var opts []hub.HubServerOption
-		if concurrent, err := cmd.Flags().GetInt("concurrent"); err == nil && concurrent > 0 {
+		if concurrent := viper.GetInt("concurrent"); concurrent > 0 {
 			opts = append(opts, hub.WithConcurrent(concurrent))
 		}
-		if appPassword != "" {
+		if appPassword := viper.GetString("appPassword"); appPassword != "" {
 			opts = append(opts, hub.WithAppPassword(appPassword))
 		}
 
@@ -65,4 +66,5 @@ func init() {
 	runCmd.PersistentFlags().Int("port", 8080, "Port to listen on")
 	runCmd.PersistentFlags().String("host", "0.0.0.0", "Host to listen on")
 	runCmd.PersistentFlags().Int("concurrent", 0, "The number of concurrent requests from the applications")
+	viper.BindPFlags(runCmd.PersistentFlags())
 }

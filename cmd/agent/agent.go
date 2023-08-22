@@ -17,6 +17,7 @@ package agent
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // agentCmd represents the agent command
@@ -32,4 +33,5 @@ func init() {
 
 	AgentCmd.PersistentFlags().String("token", "", "The agent token for the agent to communicate with the hub")
 	AgentCmd.PersistentFlags().String("hub", "", "The hub address")
+	viper.BindPFlags(AgentCmd.PersistentFlags())
 }
