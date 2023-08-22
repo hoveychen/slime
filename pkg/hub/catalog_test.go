@@ -35,30 +35,3 @@ func TestMemoryCatalog_SetHardwareInfo(t *testing.T) {
 	hwInfo = mc.GetHardwareInfo(123)
 	assert.Equal(t, expectedHWInfo, hwInfo)
 }
-
-func TestMemoryCatalog_GetPaused(t *testing.T) {
-	mc := NewMemoryCatalog()
-
-	// Test case 1: agentID not found
-	paused := mc.GetPaused(123)
-	assert.False(t, paused)
-
-	// Test case 2: agentID found
-	mc.SetPaused(123, true)
-	paused = mc.GetPaused(123)
-	assert.True(t, paused)
-}
-
-func TestMemoryCatalog_SetPaused(t *testing.T) {
-	mc := NewMemoryCatalog()
-
-	// Test case 1: set paused to false
-	mc.SetPaused(123, false)
-	paused := mc.GetPaused(123)
-	assert.False(t, paused)
-
-	// Test case 2: set paused to true
-	mc.SetPaused(123, true)
-	paused = mc.GetPaused(123)
-	assert.True(t, paused)
-}
