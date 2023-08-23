@@ -270,6 +270,7 @@ func (hs *HubServer) handleAgentAccept(w http.ResponseWriter, r *http.Request) {
 		} else {
 			agentLog.WithField("connectionID", conn.ID()).Warn("Agent already connected. Terminating the existing connection.")
 		}
+		hs.connPool.RemoveConnection(conn)
 	}
 
 	conn := pool.NewConnection(agentID, token)
