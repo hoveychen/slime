@@ -361,7 +361,21 @@ func (hs *HubServer) handleAgentSubmit(w http.ResponseWriter, r *http.Request) {
 		submitter.Header()[k] = v
 	}
 	submitter.WriteHeader(upResp.StatusCode)
-	io.Copy(submitter, upResp.Body)
+
+	writeDone := make(chan struct{}, 1)
+	go func() {
+		io.Copy(submitter, upResp.Body)
+		writeDone <- struct{}{}
+	}()
+	select {
+	case <-writeDone:
+	case <-r.Context().Done():
+		if err := conn.Close(r.Context().Err()); err != nil {
+			agentLog.WithError(err).Error("Failed to close connection")
+		}
+		hs.error(w, agentLog, r.Context().Err(), "Agent submit canceled")
+		return
+	}
 
 	agentLog.WithField("contentLength", upResp.ContentLength).Info("Agent submitted.")
 	w.WriteHeader(http.StatusOK)

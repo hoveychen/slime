@@ -143,7 +143,7 @@ func (as *AgentServer) Run(ctx context.Context) error {
 func (as *AgentServer) newHubAPIRequest(ctx context.Context, agentID int, apiPath string, reader io.Reader) *http.Request {
 	u := *as.hubURL
 	u.Path = path.Join(u.Path, apiPath)
-	req, _ := http.NewRequest("POST", u.String(), reader)
+	req, _ := http.NewRequestWithContext(ctx, "POST", u.String(), reader)
 	req.Header.Set("slime-agent-token", as.token)
 	req.Header.Set("slime-agent-id", strconv.Itoa(agentID))
 	return req
