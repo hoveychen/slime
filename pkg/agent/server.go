@@ -189,7 +189,7 @@ func (as *AgentServer) runWorker(ctx context.Context, agentID int, workerNum int
 		upstreamErr := func() error {
 			acceptReq := as.newHubAPIRequest(ctx, agentID, hub.PathAccept, nil)
 			acceptResp, err := http.DefaultClient.Do(acceptReq)
-			if errors.Is(err, io.ErrUnexpectedEOF) || strings.Contains(err.Error(), "unexpected EOF") {
+			if err != nil && (errors.Is(err, io.ErrUnexpectedEOF) || strings.Contains(err.Error(), "unexpected EOF")) {
 				// The connection has been accepted by hub and got terminated waiting for a task.
 				// Retry immediately.
 				log.WithError(err).Warnf("Lost connection... Retry right await")
