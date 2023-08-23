@@ -107,13 +107,17 @@ func (c *Connection) SubmitError(ctx context.Context, err error) error {
 		return c.err.Load().(error)
 	}
 	c.err.Store(err)
-	c.respWriter.Close()
+	if c.respWriter != nil {
+		c.respWriter.Close()
+	}
 	return nil
 }
 
 func (c *Connection) Close(err error) error {
 	c.err.Store(err)
-	c.respWriter.Close()
+	if c.respWriter != nil {
+		c.respWriter.Close()
+	}
 	return nil
 }
 
