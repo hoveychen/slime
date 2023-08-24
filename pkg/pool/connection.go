@@ -99,20 +99,6 @@ func (c *Connection) NewSubmitter() (*WriteCloser, error) {
 	return c.respWriter, nil
 }
 
-func (c *Connection) SubmitError(ctx context.Context, err error) error {
-	if !c.processing.Load() {
-		return ErrNotProcessing
-	}
-	if c.err.Load() != nil {
-		return c.err.Load().(error)
-	}
-	c.err.Store(err)
-	if c.respWriter != nil {
-		c.respWriter.Close()
-	}
-	return nil
-}
-
 func (c *Connection) Close(err error) error {
 	c.err.Store(err)
 	if c.respWriter != nil {

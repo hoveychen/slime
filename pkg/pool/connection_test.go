@@ -69,33 +69,6 @@ func TestConnection_NewSubmitter(t *testing.T) {
 	}
 }
 
-func TestConnection_SubmitError(t *testing.T) {
-	// Create a new connection.
-	conn := &Connection{}
-
-	// Test that SubmitError returns an error when the connection is not processing.
-	if err := conn.SubmitError(context.Background(), nil); err != ErrNotProcessing {
-		t.Errorf("SubmitError() error = %v, want %v", err, ErrNotProcessing)
-	}
-
-	// Set the connection to processing.
-	conn.processing.Store(true)
-
-	// Test that SubmitError sets the error and closes the response writer when the connection is processing.
-	respWriter := &WriteCloser{closed: make(chan struct{})}
-	conn.respWriter = respWriter
-	err := errors.New("test error")
-	if submitErr := conn.SubmitError(context.Background(), err); submitErr != nil {
-		t.Errorf("SubmitError() error = %v, want nil", submitErr)
-	}
-	if conn.err.Load() != err {
-		t.Errorf("SubmitError() conn.err = %v, want %v", conn.err, err)
-	}
-	if !respWriter.IsClosed() {
-		t.Errorf("SubmitError() respWriter.closed = false, want true")
-	}
-}
-
 func TestConnection_Delegate(t *testing.T) {
 	// Create a new connection.
 	conn := &Connection{
@@ -240,5 +213,19 @@ func TestConnection_IsProcessing(t *testing.T) {
 	conn.processing.Store(true)
 	if processing := conn.IsProcessing(); !processing {
 		t.Errorf("IsProcessing() = %v, want %v", processing, true)
+	}
+}
+
+func TestConnection_Close_NoResponseWriter(t *testing.T) {
+	// Create a new connection.
+	conn := &Connection{}
+
+	// Test that Close does not panic when there is no response writer.
+	err := errors.New("test error")
+	if closeErr := conn.Close(err); closeErr != nil {
+		t.Errorf("Close() error = %v, want nil", closeErr)
+	}
+	if conn.err.Load() != err {
+		t.Errorf("Close() did not store the error")
 	}
 }

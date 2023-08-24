@@ -329,17 +329,6 @@ func (hs *HubServer) handleAgentSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 	hs.connPool.RemoveConnection(conn)
 
-	errorMsg := r.Header.Get("slime-upstream-result")
-	if errorMsg != "" {
-		if err := conn.SubmitError(r.Context(), errors.New(errorMsg)); err != nil {
-			hs.error(w, agentLog, err, "Failed to submit error result")
-			return
-		}
-		// For the agent, this is not an error, just a result.
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
 	agentLog.Info("Agent is submitting...")
 	submitter, err := conn.NewSubmitter()
 	if err != nil {
@@ -360,6 +349,7 @@ func (hs *HubServer) handleAgentSubmit(w http.ResponseWriter, r *http.Request) {
 	for k, v := range upResp.Header {
 		submitter.Header()[k] = v
 	}
+	submitter.Header().Set("slime-agent-id", strconv.Itoa(agentID))
 	submitter.WriteHeader(upResp.StatusCode)
 
 	writeDone := make(chan struct{}, 1)

@@ -186,7 +186,7 @@ func (as *AgentServer) runWorker(ctx context.Context, agentID int, workerNum int
 	backoffDuration := time.Second
 	for ctx.Err() == nil {
 		var connectionID string
-		upstreamErr := func() error {
+		func() error {
 			acceptReq := as.newHubAPIRequest(ctx, agentID, hub.PathAccept, nil)
 			acceptResp, err := http.DefaultClient.Do(acceptReq)
 			if err != nil && (errors.Is(err, io.ErrUnexpectedEOF) || strings.Contains(err.Error(), "unexpected EOF")) {
@@ -222,61 +222,61 @@ func (as *AgentServer) runWorker(ctx context.Context, agentID int, workerNum int
 				log.WithError(err).Error("Parsing upstream request")
 				return err
 			}
-			as.fixUpstreamRequest(upReq)
 
-			log.WithField("path", upReq.URL.Path).Info("Invoke upstream...")
-
-			upResp, err := http.DefaultClient.Do(upReq)
-			if err != nil {
-				log.WithError(err).Error("Invoke upstream")
-				return err
-			}
-			defer upResp.Body.Close()
-			log.WithFields(logrus.Fields{
-				"status_code":    upResp.StatusCode,
-				"path":           upReq.URL.Path,
-				"content_length": upResp.ContentLength,
-			}).Info("Upstream responsed")
+			log = log.WithField("path", upReq.URL.Path)
 
 			pr, pw := io.Pipe()
-			submitReq := as.newHubAPIRequest(ctx, agentID, hub.PathSubmit, pr)
-			submitReq.Header.Set("slime-connection-id", connectionID)
 
-			go func() {
-				pw.CloseWithError(upResp.Write(pw))
-			}()
-			submitResp, err := http.DefaultClient.Do(submitReq)
-			if err != nil {
-				log.WithError(err).Error("Submit result")
+			grp, ctx := errgroup.WithContext(ctx)
+			grp.Go(func() error {
+				defer pr.Close()
+				submitReq := as.newHubAPIRequest(ctx, agentID, hub.PathSubmit, pr)
+				submitReq.Header.Set("slime-connection-id", connectionID)
+				submitResp, err := http.DefaultClient.Do(submitReq)
+				if err != nil {
+					log.WithError(err).Error("Submit result")
+					return err
+				}
+				defer submitResp.Body.Close()
+				if submitResp.StatusCode != http.StatusOK {
+					log.WithField("status_code", submitResp.StatusCode).Errorf("Submit result: %s", submitResp.Status)
+					return nil
+				}
+				log.Info("Result submitted")
 				return nil
-			}
+			})
 
-			if submitResp.StatusCode != http.StatusOK {
-				log.WithField("status_code", submitResp.StatusCode).Error(submitResp.Status)
-			}
-			log.WithFields(logrus.Fields{
-				"status_code":    upResp.StatusCode,
-				"path":           upReq.URL.Path,
-				"content_length": upResp.ContentLength,
-			}).Info("Result submitted")
+			grp.Go(func() error {
+				defer pw.Close()
+				log.Info("Invoke upstream...")
 
+				as.fixUpstreamRequest(upReq)
+				upReq = upReq.WithContext(ctx)
+				upResp, err := http.DefaultClient.Do(upReq)
+				if err != nil {
+					log.WithError(err).Error("Invoke upstream")
+					return err
+				}
+				defer upResp.Body.Close()
+
+				log.WithFields(logrus.Fields{
+					"status_code":    upResp.StatusCode,
+					"content_length": upResp.ContentLength,
+				}).Info("Upstream responsed")
+
+				if err := upResp.Write(pw); err != nil {
+					log.WithError(err).Error("Write upstream response")
+					return err
+				}
+				return nil
+			})
+
+			if err := grp.Wait(); err != nil {
+				log.WithError(err).Error("Worker error")
+				return err
+			}
 			return nil
 		}()
-
-		if upstreamErr != nil {
-			// Need to submit the error result.
-			submitReq := as.newHubAPIRequest(ctx, agentID, hub.PathSubmit, nil)
-			submitReq.Header.Set("slime-connection-id", connectionID)
-			submitReq.Header.Set("slime-upstream-error", upstreamErr.Error())
-			submitResp, err := http.DefaultClient.Do(submitReq)
-			if err != nil {
-				log.WithError(err).Error("Submit error result")
-				continue
-			}
-			if submitResp.StatusCode != http.StatusOK {
-				log.WithField("status_code", submitResp.StatusCode).Error(submitResp.Status)
-			}
-		}
 	}
 
 	return ctx.Err()
