@@ -240,7 +240,7 @@ func (as *AgentServer) runWorker(ctx context.Context, agentID int, workerNum int
 				defer submitResp.Body.Close()
 				if submitResp.StatusCode != http.StatusOK {
 					log.WithField("status_code", submitResp.StatusCode).Errorf("Submit result: %s", submitResp.Status)
-					return nil
+					return errors.New(submitResp.Status)
 				}
 				log.Info("Result submitted")
 				return nil
