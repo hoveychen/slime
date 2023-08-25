@@ -35,24 +35,45 @@ Slime Proxy offers several unique features that set it apart from traditional lo
 ## Usage
 Slime Proxy is ideal for scenarios where you have multiple service providers offering the same API and you want to manage them through a single gateway. It's perfect for microservice architectures, multi-cloud environments, or simply when you want to ensure high availability and performance for your services.
 
-### Installation
-To install the project, ensure that you have Golang version 1.20 or higher with module enabled. You can then install the project using the following command:
+## Installation
+### Docker
+
+Docker hub repoistory: [https://hub.docker.com/r/hoveychen/slime](https://hub.docker.com/r/hoveychen/slime)
+
+```bash
+docker pull hoveychen/slime:latest
+```
+
+
+### Pre-built binaries
+
+Download binaries: [https://github.com/hoveychen/slime/releases](https://github.com/hoveychen/slime/releases)
+
+
+### Build from source
+
+Alternatively, you can build the project. ensure that you have Golang version 1.20 or higher with module enabled. You can then install the project using the following command:
+
 ```bash
 go install -u github.com/hoveychen/slime@latest
 ```
-Alternatively, you can download the pre-compiled binary from the provided link.
-
-[https://github.com/hoveychen/slime/releases](https://github.com/hoveychen/slime/releases)
-
 
 ## Getting Started
 To initialize the proxy, a minimum of one hub and one agent is required.
 
 ### Hub Configuration
 Firstly, generate a `<secret>` for the hub. This `<secret>` can be any string, preferably generated from a random password generator. It should be stored securely and privately. If leaked, the proxy becomes susceptible to attacks from forged agents.
+
+Optionally, assign an `<appPassword>` for the applications to invoke with. It's used to provide the most basic authentication to the applications. It's recommended when the hub is exposed to the unsafe environment like the Internet.
+
 Next, execute the hub server using the following command:
 ```bash
-slime hub run --secret <secret>
+slime hub run --secret <secret> --appPassword <appPassword> --port <port>
+```
+
+or with docker
+```bash
+docker run -d --restart always --name slime-hub -e SECRET=<secret> -e APP_PASSWORD=<appPassword> -p <port>:8080 hoveychen/slime:latest hub run
 ```
 > [!NOTE]
 > 1. It is recommended to set the `concurrent` flag to a reasonable value (e.g., `1024`) in a production environment, in addition to the explicit flags binding the `host` and `port` configurations. This helps to mitigate potential Distributed Denial of Service (DDoS) attacks.
@@ -66,10 +87,33 @@ Firstly, generate an *Agent Token* for the agent to access the hub. This can be 
 ```bash
 slime hub register --secret <secret> --name <my agent name>
 ```
+or with docker
+```bash
+docker run --rm -e SECRET=<secret> hoveychen/slime hub register --name <my agent name>
+```
 This command will output an encrypted agent token. While it is possible to reuse the agent token across multiple agents, it is advisable to assign a unique agent token to each agent for auditing purposes and token reroll.
 Next, execute the agent server using the following command:
 ```bash
 slime agent run --token <agent token> --hub <hub address> --upstream <upstream address> 
+```
+or with docker
+```bash
+# when the upstream is not in the same node with the agent
+# or the upsteram service is in the same docker bridge network
+docker run -d --restart always --name slime-agent \ 
+           -e TOKEN=<agent token> -e HUB=<hub address> \
+           -e UPSTREAM=<upstream address> agent run
+
+# when the upstream provider and the agent are in the same node in Linux
+docker run -d --restart always --name slime-agent \
+           -e TOKEN=<agent token> -e HUB=<hub address> \
+           -e UPSTREAM=127.0.0.1:<upstream port> \
+           --network host agent run
+
+# when the upstream provider and the agent are in the same node in Windows/Mac
+docker run -d --restart always --name slime-agent \
+           -e TOKEN=<agent token> -e HUB=<hub address> \
+           -e UPSTREAM=host.docker.internal:<upstream port> agent run
 ```
 > Typically, one agent is responsible for one upstream service. To configure multiple agents for multiple upstream services in a single command, specify multiple upstream addresses separated by commas as shown below:
 > ```bash
