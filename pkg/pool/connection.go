@@ -76,6 +76,10 @@ func (c *Connection) ScopePaths() []string {
 	return c.agentToken.GetScopePaths()
 }
 
+func (c *Connection) Scopes() []string {
+	return c.agentToken.GetScopes()
+}
+
 func (c *Connection) IsProcessing() bool {
 	return c.processing.Load()
 }

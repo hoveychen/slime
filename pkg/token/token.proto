@@ -7,4 +7,5 @@ message AgentToken {
   string name = 2;
   int64 expire_at = 3;
   repeated string scope_paths = 4;
+  repeated string scopes = 5;
 }

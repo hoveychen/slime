@@ -128,12 +128,17 @@ func (hs *HubServer) handleAppRequest(w http.ResponseWriter, r *http.Request) {
 		}()
 	}
 
+	scope := r.Header.Get("slime-scope")
+
 	for r.Context().Err() == nil {
 		conns := hs.connPool.GetPendingConnections()
 		rand.Shuffle(len(conns), func(i, j int) {
 			conns[i], conns[j] = conns[j], conns[i]
 		})
 		for _, conn := range conns {
+			if scope != "" && !slices.Contains(conn.Scopes(), scope) {
+				continue
+			}
 			if len(conn.ScopePaths()) > 0 && !slices.Contains(conn.ScopePaths(), r.URL.Path) {
 				continue
 			}
