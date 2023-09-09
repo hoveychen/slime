@@ -42,6 +42,7 @@ type ConnectionInfo struct {
 	Since        time.Time
 	AgentName    string
 	ScopePaths   []string
+	Scopes       []string
 	Processing   bool
 	HardwareInfo *hwinfo.HWInfo
 }
@@ -229,6 +230,7 @@ func (hs *HubServer) GetConnectionsInfos() []*ConnectionInfo {
 			AgentID:      conn.AgentID(),
 			Since:        conn.Since(),
 			ScopePaths:   conn.ScopePaths(),
+			Scopes:       conn.Scopes(),
 			Processing:   conn.IsProcessing(),
 			HardwareInfo: hs.catalog.GetHardwareInfo(conn.AgentID()),
 		})
