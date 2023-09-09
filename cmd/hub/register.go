@@ -36,6 +36,7 @@ var registerCmd = &cobra.Command{
 		name := viper.GetString("name")
 		age := viper.GetDuration("age")
 		scopePaths := viper.GetStringSlice("scopePaths")
+		scopes := viper.GetStringSlice("scopes")
 		secret := viper.GetString("secret")
 		if secret == "" {
 			logrus.Fatal("The secret is required")
@@ -50,6 +51,7 @@ var registerCmd = &cobra.Command{
 			Id:         rand.Int63(),
 			Name:       name,
 			ScopePaths: scopePaths,
+			Scopes:     scopes,
 		}
 		if age > 0 {
 			agentToken.ExpireAt = time.Now().Add(age).Unix()
@@ -72,5 +74,6 @@ func init() {
 	registerCmd.PersistentFlags().String("name", "", "The agent name")
 	registerCmd.PersistentFlags().Duration("age", 0, "When specified, the token will be expired after the specified age. format like '1h2m3s'")
 	registerCmd.PersistentFlags().StringSlice("scopePaths", []string{}, "When specified, the agent accepts only the scoped paths")
+	registerCmd.PersistentFlags().StringSlice("scopes", []string{}, "When the application specified a scope to invoke, only the agent with the scopes can be accepted.")
 	viper.BindPFlags(registerCmd.PersistentFlags())
 }
