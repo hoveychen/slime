@@ -344,7 +344,8 @@ func (hs *HubServer) handleAgentSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 	defer submitter.Close()
 
-	upResp, err := http.ReadResponse(bufio.NewReader(r.Body), nil)
+	// To support Server Sent Event, we have to use a short buffer
+	upResp, err := http.ReadResponse(bufio.NewReaderSize(r.Body, 20), nil)
 	if err != nil {
 		if err := conn.Close(err); err != nil {
 			agentLog.WithError(err).Error("Failed to close connection")
