@@ -21,8 +21,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseAddrWithHostAndPort(t *testing.T) {
@@ -326,4 +330,67 @@ func TestJoinHubHTTPError(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected non-nil error, but got nil")
 	}
+}
+
+func TestGetOrCreateAgentID(t *testing.T) {
+	// Backup the original agentIDFile and restore it after the test
+	originalAgentIDFile := agentIDFile
+	defer func() { agentIDFile = originalAgentIDFile }()
+
+	// Create a temporary file for testing
+	tmpfile, err := os.CreateTemp("", "agentID")
+	if err != nil {
+		t.Fatalf("Failed to create temporary file: %v", err)
+	}
+	tmpfile.Close()
+	os.Remove(tmpfile.Name())
+
+	agentIDFile = tmpfile.Name()
+
+	// Test case 1: agent ID file does not exist
+	id, err := getOrCreateAgentID()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	data, err := os.ReadFile(agentIDFile)
+	if err != nil {
+		t.Fatalf("Failed to read agent ID file: %v", err)
+	}
+	expectedID, err := strconv.Atoi(string(data))
+	if err != nil {
+		t.Fatalf("Invalid agent ID in file: %v", err)
+	}
+	if id != expectedID {
+		t.Errorf("Expected ID %d, got %d", expectedID, id)
+	}
+
+	// Test case 2: agent ID file exists
+	id, err = getOrCreateAgentID()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if id != expectedID {
+		t.Errorf("Expected ID %d, got %d", expectedID, id)
+	}
+
+	// Test case 3: agent ID file contains invalid data
+	err = os.WriteFile(agentIDFile, []byte("invalid"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write to agent ID file: %v", err)
+	}
+	_, err = getOrCreateAgentID()
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
+}
+
+func TestWithAgentID(t *testing.T) {
+	// Create a mock AgentServer
+	as := &AgentServer{}
+
+	// Call the WithAgentID function
+	WithAgentID(123)(as)
+
+	// Check that the agentID is set correctly
+	assert.Equal(t, 123, as.agentID)
 }

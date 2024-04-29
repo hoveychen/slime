@@ -33,5 +33,6 @@ func init() {
 
 	AgentCmd.PersistentFlags().String("token", "", "The agent token for the agent to communicate with the hub")
 	AgentCmd.PersistentFlags().String("hub", "", "The hub address")
+	AgentCmd.PersistentFlags().Int("agentID", 0, "Override the agent ID")
 	viper.BindPFlags(AgentCmd.PersistentFlags())
 }

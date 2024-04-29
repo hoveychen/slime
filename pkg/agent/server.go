@@ -21,11 +21,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -49,6 +51,7 @@ type AgentServer struct {
 	upstreamURL *url.URL
 	hubURL      *url.URL
 	hwInfo      *hwinfo.HWInfo
+	agentID     int
 }
 
 type AgentServerOption func(as *AgentServer)
@@ -63,12 +66,18 @@ func NewAgentServer(hubAddr, upstreamAddr, token string, opts ...AgentServerOpti
 		return nil, err
 	}
 
+	defaultAgentID, err := getOrCreateAgentID()
+	if err != nil {
+		return nil, err
+	}
+
 	as := &AgentServer{
 		token:       token,
 		numWorker:   defaultNumWorker,
 		hubURL:      hubURL,
 		upstreamURL: upstreamURL,
 		reportHW:    true,
+		agentID:     defaultAgentID,
 	}
 	for _, opt := range opts {
 		opt(as)
@@ -91,6 +100,44 @@ func WithReportHardware(report bool) AgentServerOption {
 	return func(as *AgentServer) {
 		as.reportHW = report
 	}
+}
+
+func WithAgentID(agentID int) AgentServerOption {
+	return func(as *AgentServer) {
+		as.agentID = agentID
+	}
+}
+
+var agentIDFile = "agentID.txt"
+
+// getOrCreateAgentID returns the agent ID. If the agent ID was not generated, it will generate a new random one,
+// otherwise, it will return the existing agent ID from a local AID file.
+func getOrCreateAgentID() (int, error) {
+	// Check if the agentID file exists
+	if _, err := os.Stat(agentIDFile); os.IsNotExist(err) {
+		// Generate a new agent ID if the file does not exist
+		newID := int(rand.Int31())
+		// Write the new ID to the file
+		err = os.WriteFile(agentIDFile, []byte(fmt.Sprint(newID)), 0644)
+		if err != nil {
+			return 0, fmt.Errorf("failed to write agent ID to file: %v", err)
+		}
+		return newID, nil
+	}
+
+	// Read the existing ID from the file
+	data, err := os.ReadFile(agentIDFile)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read agent ID from file: %v", err)
+	}
+
+	// Convert the read data to an integer
+	agentID, err := strconv.Atoi(string(data))
+	if err != nil {
+		return 0, fmt.Errorf("invalid agent ID in file: %v", err)
+	}
+
+	return agentID, nil
 }
 
 func parseAddr(addr string) (*url.URL, error) {
@@ -129,7 +176,7 @@ func (as *AgentServer) Run(ctx context.Context) error {
 	for i := 0; i < as.numWorker; i++ {
 		workerNum := i
 		grp.Go(func() error {
-			agentID := int(rand.Int63())
+			agentID := as.agentID + workerNum
 			// connect to hub to ensure the hub address and token is correct.
 			if err := as.joinHub(ctx, agentID); err != nil {
 				return err

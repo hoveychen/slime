@@ -49,6 +49,10 @@ var runCmd = &cobra.Command{
 		if !viper.GetBool("reportHardware") {
 			opts = append(opts, agent.WithReportHardware(false))
 		}
+		agentID := viper.GetInt("agentID")
+		if agentID != 0 {
+			opts = append(opts, agent.WithAgentID(agentID))
+		}
 
 		grp, ctx := errgroup.WithContext(cmd.Context())
 		for _, upstream := range upstreams {
