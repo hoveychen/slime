@@ -275,8 +275,15 @@ func (as *AgentServer) runWorker(ctx context.Context, agentID int, workerNum int
 			pr, pw := io.Pipe()
 
 			grp, ctx := errgroup.WithContext(ctx)
+			recvHeader := make(chan struct{})
 			grp.Go(func() error {
 				defer pr.Close()
+
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-recvHeader:
+				}
 				submitReq := as.newHubAPIRequest(ctx, agentID, hub.PathSubmit, pr)
 				submitReq.Header.Set("slime-connection-id", connectionID)
 				submitResp, err := http.DefaultClient.Do(submitReq)
@@ -310,6 +317,12 @@ func (as *AgentServer) runWorker(ctx context.Context, agentID int, workerNum int
 					"status_code":    upResp.StatusCode,
 					"content_length": upResp.ContentLength,
 				}).Info("Upstream responsed")
+
+				select {
+				case recvHeader <- struct{}{}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
 
 				if err := upResp.Write(pw); err != nil {
 					log.WithError(err).Error("Write upstream response")
